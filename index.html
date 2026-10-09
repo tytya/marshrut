@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Маршруты</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--bg:#141414;--card:#262626;--text:#f2f2f2;--mute:#a0a0a0;--line:#383838;--blue:#3b82f6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 "Inter",system-ui,sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 90px}
+.top{display:flex;align-items:center;justify-content:space-between;margin:6px 0 12px;gap:8px}
+h1{font-size:24px;margin:0}
+h2{font-size:18px;margin:22px 0 4px}
+#map{height:340px;border-radius:16px;border:2px solid var(--blue)}
+#map.pick{cursor:crosshair;border-color:#f59e0b}
+button,input,select,textarea{font:inherit;color:var(--text)}
+.chips{display:flex;gap:8px;margin:12px 0 0;overflow-x:auto;padding-bottom:2px}
+.chip{border:0;border-radius:20px;padding:8px 16px;background:var(--card);cursor:pointer;white-space:nowrap}
+.chips.sub .chip{background:none;border:1px solid #444;padding:6px 14px;font-size:14px}
+.chip.on{background:var(--text);color:#101010;font-weight:600;border-color:var(--text)}
+.chip.ghost{background:none;border:1px dashed #555;color:var(--mute)}
+.share{background:var(--card);border:0;border-radius:20px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.note{background:var(--card);border-radius:14px;padding:16px;margin:10px 0;font-weight:600}
+.day{background:var(--card);border-radius:14px;padding:16px;margin:10px 0}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px}
+.pill{border-radius:20px;padding:4px 12px;font-size:13px;font-weight:600;color:#101010}
+.right{display:flex;align-items:center;gap:8px}
+.km{background:#333;border-radius:20px;padding:4px 12px;font-size:13px;white-space:nowrap}
+.ib{background:#333;border:0;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:14px}
+.ib.on{background:var(--blue)}
+.pt{display:grid;grid-template-columns:28px 1fr auto;gap:2px 8px;padding:10px 0;border-top:1px solid var(--line)}
+.main{cursor:pointer}
+.n{width:22px;height:22px;border-radius:50%;background:#fff;color:#111;font-size:12px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+.pt b{display:block}
+.pt span{color:var(--mute);font-size:14px}
+.acts{display:flex;gap:2px}
+.acts button{background:none;border:0;color:var(--mute);padding:4px 6px;cursor:pointer;border-radius:8px}
+.acts button:hover{background:#333;color:var(--text)}
+.tools{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.tools button{flex:1;background:none;border:1px dashed #555;border-radius:12px;padding:9px;color:var(--mute);cursor:pointer}
+.tools button:hover{border-color:var(--blue);color:var(--text)}
+.tools .danger:hover{border-color:#ef4444;color:#ef4444}
+.fab{position:fixed;right:16px;bottom:16px;background:var(--blue);border:0;border-radius:28px;padding:14px 20px;font-weight:600;box-shadow:0 4px 14px #0008;cursor:pointer}
+.mk{width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;font-size:13px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 1px 4px #0007}
+.tag{display:inline-block;background:#333;border-radius:20px;padding:4px 12px;font-size:13px;margin-bottom:8px}
+dialog{background:var(--card);color:var(--text);border:0;border-radius:18px;width:min(460px,94vw);padding:20px}
+dialog::backdrop{background:#000a}
+dialog h3{margin:0 0 8px;font-size:19px}
+label{display:block;font-size:13px;color:var(--mute);margin:12px 0 4px}
+input,select,textarea{width:100%;background:#1a1a1a;border:1px solid #444;border-radius:10px;padding:10px}
+textarea{min-height:70px;resize:vertical}
+.row{display:flex;gap:8px}
+.row>.btn{flex:none;background:var(--blue)}
+.res{margin-top:6px;max-height:140px;overflow:auto}
+.res div{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:14px}
+.res div:hover{background:#333}
+.coord{font-size:13px;color:var(--mute);margin-top:6px}
+.foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.btn{border:0;border-radius:20px;padding:8px 16px;background:#333;cursor:pointer}
+.btn.ok{background:var(--blue)}
+button:focus-visible,.main:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.dd{position:relative}
+.sq{width:44px;height:44px;border-radius:12px;border:0;background:var(--card);font-size:24px;line-height:1;cursor:pointer;color:var(--text);display:grid;place-items:center;padding:0}
+.cp{margin-left:auto;color:var(--mute)}
+.cp:hover,.sq:hover,.ttl:hover{background:#333;color:var(--text)}
+.ttl{display:flex;align-items:center;gap:8px;background:none;border:0;font-size:26px;font-weight:700;cursor:pointer;padding:4px 8px;border-radius:10px}
+.ttl svg{color:var(--mute)}
+.menu{display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:210px;background:var(--card);border:1px solid #444;border-radius:14px;padding:6px;z-index:2000;box-shadow:0 8px 24px #000a}
+.menu.on{display:block}
+.mi{display:block;width:100%;text-align:left;background:none;border:0;padding:10px 12px;border-radius:10px;cursor:pointer;white-space:nowrap}
+.mi:hover{background:#333}
+.mi.cur{font-weight:700}
+.mi.sub{color:var(--mute)}
+.mk.sb{background:#00704A;font-size:15px}
+.mk.xm{background:#fff;color:#111;font-size:14px}
+.sbn{color:#1fa971}
+.n.sb{background:#00704A;color:#fff;font-size:13px}
+.n.x{background:none;color:var(--mute);font-size:17px}
+.xbox{font-weight:400}
+.hint{color:var(--mute);font-size:14px;padding:4px 0}
+.acts{align-items:center}
+.acts select.asg{width:auto;height:26px;padding:0 12px;border:0;border-radius:20px;background:#333;color:var(--mute);font-size:13px;appearance:none;-webkit-appearance:none;cursor:pointer}
+.btn.danger{background:#dc2626}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#f2f2f2;color:#111;padding:10px 18px;border-radius:20px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;z-index:3000;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+.mrow{display:flex;align-items:center}
+.mrow .mi{flex:1;width:auto}
+.mx{background:none;border:0;color:var(--mute);padding:6px 8px;cursor:pointer;border-radius:8px}
+.mx:hover{background:#333;color:var(--text)}
+.pb{border:0;border-radius:14px;padding:4px 10px;margin:6px 4px 0 0;color:#101010;cursor:pointer;font-size:13px}
+
+/* v7: компактные дни, видимые активные теги, режим «посещено» */
+.chips .chip{flex:none}
+.chips.sub .chip{min-width:38px;text-align:center;padding:6px 12px}
+.chips.sub .chip.on{background:var(--text);color:#101010;border-color:var(--text);font-weight:700}
+.chips.sub .chip.ghost{border:1px dashed #555;color:var(--mute)}
+.head{flex-wrap:nowrap}
+.pill{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.right{flex:none;gap:6px}
+.km{font-size:12px;padding:4px 10px}
+.tools{flex-wrap:nowrap;gap:6px}
+.tools button{min-width:0;padding:9px 4px;font-size:13px;white-space:nowrap}
+.tools .danger{flex:none;padding:9px 14px}
+.cb{width:22px;height:22px;border-radius:6px;border:2px solid #777;background:none;cursor:pointer;display:grid;place-items:center;padding:0;margin-top:1px;color:#fff;font-size:14px;font-weight:800;line-height:1}
+.cb.on{background:var(--blue);border-color:var(--blue)}
+.pt.done b,.pt.done span{opacity:.5}
+.pt.done b{text-decoration:line-through}
+.pt.done .n{opacity:.5}
+.pr{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center}
+.pr .pb{margin:0;min-width:34px;padding:6px 0;text-align:center;font-size:14px;font-weight:600}
+.pr .pb.ed{margin-left:auto;padding:6px 14px}
+.pt{position:relative}
+.pt[data-r]{transition:transform .15s}
+.pt.dragging{z-index:5;background:#333;border-radius:10px;box-shadow:0 6px 18px #000a;transition:none}
+body.dragging{user-select:none;-webkit-user-select:none}
+.dh{touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;font-size:18px;line-height:1}
+.pt .hrs{display:block;font-size:13px}
+.km.all{background:#1f6f4a}
+.gm-style .gm-style-iw-c,.gm-style .gm-style-iw-d{color:#202124!important}
+.mk.hotel{background:#8b5cf6;color:#fff;font-size:15px}
+.n.hotel{background:#8b5cf6;color:#fff;font-size:13px}
+.gb{background:none;border:1px dashed #555;color:var(--mute);border-radius:12px;padding:3px 10px;font-size:12px;margin-top:4px;cursor:pointer}
+.gh{font-size:13px;color:var(--mute);margin-top:4px}
+.gh summary{cursor:pointer}
+.gh div{padding-left:18px}
+.gm-style .gm-style-iw-c{color:#202124}
+.pp-t{font-weight:700;font-size:15px;line-height:1.25;color:#111!important}
+.pp-d{font-size:13px;margin-top:3px;color:#5f6368!important}
+.ph{display:inline-block;margin-top:6px;padding:3px 9px;border-radius:10px;background:#eef1f4;font-size:12px;font-weight:600;color:#202124!important}
+.gmrow{margin-top:6px;font-size:13px;color:var(--mute)}
+.gmb{display:inline-block;padding:7px 14px;border-radius:14px;background:#2a2a2a;color:var(--text);text-decoration:none;font-size:13px;margin:6px 6px 0 0;border:1px solid #444}
+.gmrow span{margin-right:6px}
+.pill{display:inline-flex;align-items:center;gap:10px;background:var(--dc);color:#fff;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;min-width:0;max-width:100%}
+.pill .dn{flex:none}
+.pill .sep{flex:none;width:1px;height:16px;background:#fff;margin-left:6px}
+.pill .tl{display:inline-flex;align-items:center;gap:6px;min-width:0;color:#fff;font-style:italic;text-decoration:underline;text-underline-offset:3px}
+.pill .tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill svg{flex:none}
+.chips.sub .chip[style*="--dc"]{background:var(--dc);color:#fff;border:2px solid transparent;font-weight:600}
+.chips.sub .chip.on[style*="--dc"]{background:var(--dc);color:#fff;border-color:#fff}
+.note.nt{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.hn{color:#a78bfa}
+.pt .main span{display:block}
+.pt .hrs{margin-top:2px}
+.ic{width:1.1em;height:1.1em;vertical-align:-.18em;flex:none}
+.ib .ic,.mx .ic,.acts button .ic,.tools .ic{width:17px;height:17px;vertical-align:middle}
+.hrs .ic,.ph .ic,.gb .ic,#fGh .ic{width:13px;height:13px;vertical-align:-2px;margin-right:2px}
+.mk .ic,.n .ic{width:15px;height:15px;vertical-align:middle}
+.mk.sb,.n.sb{background:none;padding:0}
+.mk.sb .ic,.n.sb .ic{width:100%;height:100%}
+.pill .dn{font-weight:500}
+.pill .ic{width:14px;height:14px}
+.pt b{font-weight:600}
+.gm-style .gm-style-iw-c{padding:12px 14px!important;max-width:280px!important}
+.gm-style .gm-style-iw-chr{position:absolute;top:0;right:0;height:auto}
+.gm-style .gm-ui-hover-effect{width:26px!important;height:26px!important}
+.gm-style .gm-ui-hover-effect>span{width:16px!important;height:16px!important;margin:5px!important}
+.pp-t{font-weight:600!important;padding-right:20px}
+.head{margin-bottom:16px}
+.pill .tt{font-weight:400}
+.pt b{font-weight:500;margin-bottom:4px}
+.pt .main .hrs{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:3px 10px;border-radius:10px;background:#333;color:#e6e6e6;font-size:12px;font-weight:600}
+.pt .main .hop{display:block;margin-top:8px;font-size:13px;color:var(--mute)}
+.pt .main > span:not(.hrs):not(.hop){margin-top:2px}
+.ib .ic,.mx .ic{width:14px;height:14px}
+.acts button .ic{width:15px;height:15px}
+.chips.sub .chip[style*="--dc"],.chips.sub .chip.on[style*="--dc"]{font-weight:500}
+.pr .pb{color:#fff}
+.pr .pb.ed{color:#101010}
+.pr .pb .ic{width:14px;height:14px}
+.n.x{background:#fff}
+.n.x .ic,.mk.xm .ic{color:#f5c518}
+.n.hotel .ic,.mk.hotel .ic{color:#fff}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-clock" viewBox="0 0 24 24" fill="none"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12 6V12L16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-trash" viewBox="0 0 24 24" fill="none"><path d="M3 6H5H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10 11V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M14 11V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-star" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor"/></symbol><symbol id="i-check" viewBox="0 0 24 24" fill="none"><path d="M9 11L12 14L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M21 12V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-edit" viewBox="0 0 24 24" fill="none"><path d="M12 20H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M16.5 3.49998C16.8978 3.10216 17.4374 2.87866 18 2.87866C18.2786 2.87866 18.5544 2.93353 18.8118 3.04014C19.0692 3.14674 19.303 3.303 19.5 3.49998C19.697 3.69697 19.8532 3.93082 19.9598 4.18819C20.0665 4.44556 20.1213 4.72141 20.1213 4.99998C20.1213 5.27856 20.0665 5.55441 19.9598 5.81178C19.8532 6.06915 19.697 6.303 19.5 6.49998L7 19L3 20L4 16L16.5 3.49998Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-sb" viewBox="0 0 24 24" fill="none"><g clip-path="url(#clip0_1209_136)">
+<rect width="24" height="24" rx="12" fill="white"/>
+<path d="M11.4458 -0.00850465C11.6258 -0.0170775 11.8061 -0.020761 11.9863 -0.019551C15.1845 -0.0252822 18.2532 1.25356 20.5129 3.53387C22.2518 5.28316 23.4151 7.52852 23.8455 9.96597C23.9449 10.5276 24.0201 11.1769 24.0198 11.7478C23.3455 11.8013 22.8431 11.6761 22.2561 11.3513C21.4548 10.9078 20.8732 10.6388 19.9266 10.7718C20.082 11.0722 20.2815 11.4512 20.3885 11.7705C21.7043 11.6948 22.041 12.4294 23.2213 12.7045C23.4837 12.7656 23.7448 12.7577 24.0108 12.7442C24.0038 13.0037 23.9685 13.3524 23.9315 13.6086C22.8385 13.7717 22.3896 13.0941 21.4505 12.7758C21.187 12.6864 20.9683 12.6725 20.6962 12.6733C20.7692 12.9587 20.8519 13.2866 20.889 13.5774C21.8753 13.6014 22.2586 14.2712 23.1565 14.4757C23.3673 14.5237 23.5723 14.5163 23.7859 14.5064C23.7203 14.8383 23.6384 15.1666 23.5403 15.4901C22.4109 15.5212 22.2557 14.6169 21.0113 14.5996C21.0189 14.8596 21.0219 15.1196 21.0203 15.3797C21.8641 15.4 22.1138 15.9471 22.8363 16.1992C22.976 16.248 23.1434 16.2586 23.2904 16.2635C23.1628 16.5953 23.0453 16.8993 22.8881 17.2182C22.1311 17.14 22.0744 16.3572 20.9356 16.3668C20.8988 16.5891 20.865 16.8045 20.8188 17.0253C21.8109 17.0345 21.8155 17.739 22.5631 17.8796C22.4391 18.0818 22.1634 18.5969 22.0184 18.7572C21.4854 18.4262 21.3609 17.9738 20.5831 17.8909C20.6527 17.6608 20.7163 17.429 20.7735 17.1955C19.9887 17.1757 19.3616 16.8803 18.7782 16.3713C18.886 15.5555 18.1649 14.8312 17.7163 14.2261C17.5506 14.0026 17.2796 13.6483 17.2306 13.3737C17.1238 12.7764 17.4571 12.0659 17.5731 11.4854C17.6686 11.0077 17.7047 10.5032 17.6199 10.0304C17.4558 9.11633 16.9251 8.19702 16.1707 7.6592C16.3235 7.88835 16.4779 8.07644 16.6267 8.32103C17.1647 9.19132 17.3662 10.1873 17.1374 11.1939C16.9549 11.9975 16.4616 12.9688 16.8449 13.784C17.1992 14.5375 17.9477 15.1212 18.1999 15.9255C18.4101 16.5956 17.9749 17.4084 17.6576 17.9816C18.037 18.3235 18.3369 18.5749 18.8183 18.7954C19.1328 18.9395 19.688 19.1367 20.0386 19.0333C20.1969 18.9867 20.3193 18.6085 20.3816 18.4538C21.071 18.552 21.166 18.9228 21.654 19.2996C21.4584 19.555 21.2562 19.8054 21.0477 20.0501C20.7139 19.6683 20.5189 19.4083 20.0368 19.2224C19.9585 19.3861 19.8704 19.5448 19.7731 19.698C20.1752 19.8253 20.4059 20.1562 20.6578 20.4773C20.424 20.7231 20.1946 20.9338 19.945 21.1619C19.7615 20.8743 19.565 20.6476 19.2853 20.4523C19.1878 20.5855 19.0861 20.7154 18.9802 20.8418C19.235 21.0303 19.3757 21.2402 19.5409 21.5029C19.2794 21.7268 18.9392 21.9664 18.6548 22.1582C18.5357 21.3983 17.9526 20.8453 17.5647 20.2138C17.2318 19.6722 17.1552 19.3287 17.2548 18.7106C17.1419 18.9176 17.0341 19.1232 16.992 19.3612C16.8298 20.277 17.6083 21.0261 17.9536 21.8029C18.0702 22.0652 18.1071 22.2067 18.1494 22.4802C17.9222 22.6135 17.6871 22.7507 17.4487 22.8622C17.3447 21.7669 16.6301 21.0064 16.3149 19.9887C16.2703 19.8452 16.2398 19.6139 16.2586 19.4613C16.3462 18.7546 16.8566 18.1778 17.1842 17.57C17.7724 16.5801 17.7306 15.8325 17.0161 14.9264C16.6522 14.4649 16.0642 13.7986 16.0448 13.1849C16.0217 12.4512 16.4148 11.7626 16.5863 11.0619C16.7364 10.4484 16.7485 9.8102 16.5788 9.19722C16.3608 8.40982 15.8265 7.56368 15.1111 7.15535C15.3616 7.51661 15.5508 7.69592 15.7692 8.12289C15.984 8.53479 16.1172 8.98481 16.1614 9.44792C16.2064 9.86018 16.1802 10.2772 16.0838 10.6804C15.8652 11.5822 15.2675 12.499 15.4645 13.483C15.682 14.5689 17.0697 15.2682 16.9362 16.4547C16.8061 17.6125 15.445 18.5813 15.5376 19.7797C15.6059 20.6621 16.4301 21.6052 16.679 22.4694C16.7611 22.7546 16.7836 22.8806 16.8033 23.1733C16.5506 23.2916 16.2256 23.415 15.9629 23.5036C15.968 23.342 15.9714 23.1643 15.9476 23.0039C15.8344 22.2378 15.3874 21.5607 15.0562 20.8773C14.922 20.6002 14.7633 20.2402 14.7283 19.9389C14.5963 18.8065 15.7478 17.9311 16.0784 16.8844C16.5179 15.493 15.4036 14.9575 14.8756 13.9066C14.3432 12.8464 15.0587 11.7729 15.4089 10.7983C15.7184 9.93727 15.6567 8.98686 15.2553 8.16026C15.0479 7.73439 14.758 7.35477 14.4025 7.04384C14.3411 6.9891 14.185 6.83497 14.1026 6.87626C14.1144 6.94483 14.465 7.4316 14.5371 7.5614C14.7217 7.89386 14.8514 8.25431 14.9213 8.62867C15.1537 9.8644 14.8098 10.5464 14.3254 11.6361C14.1635 12.0006 14.0236 12.3945 13.969 12.7858C13.8288 13.7903 14.2908 14.3634 14.8718 15.0914C15.0227 15.2804 15.2132 15.5879 15.2831 15.8258C15.7537 17.3681 13.6524 18.4972 13.8498 19.9893C14.0279 21.3354 15.2224 22.3195 15.0303 23.7916C14.7393 23.8685 14.4451 23.9327 14.1485 23.9841C14.3755 22.4158 13.4214 21.5565 13.0525 20.1974C12.6742 18.8036 14.6747 17.5634 14.5744 16.1734C14.5118 15.3065 13.7585 14.8636 13.4403 14.114C13.3735 13.9518 13.3343 13.7903 13.3032 13.6171C13.2497 13.2085 12.7789 13.4205 12.5287 13.4942C12.0874 13.5928 11.7682 13.5887 11.3362 13.4523C11.2138 13.4193 11.0493 13.3583 10.9236 13.3659C10.6921 13.38 10.6755 13.7945 10.6142 13.9622C10.5496 14.1393 10.492 14.2811 10.3916 14.4393C10.1127 14.8788 9.70879 15.2407 9.52286 15.7363C8.95847 17.293 11.0587 18.4162 10.9916 19.9232C10.9749 20.3001 10.7877 20.7286 10.6228 21.0697C10.1335 22.0822 9.71408 22.8189 9.85225 23.9843C9.55679 23.9328 9.26372 23.8683 8.97386 23.791C8.94702 23.6599 8.94701 23.4953 8.95035 23.361C8.98156 22.1046 10.2452 20.8819 10.1551 19.6654C10.0757 18.5931 8.91271 17.678 8.68504 16.6302C8.466 15.6221 9.21302 15.0902 9.69426 14.3388C10.6919 12.7812 9.40113 11.5078 9.07207 10.0357C8.90495 9.28802 9.06942 8.26263 9.44867 7.59789C9.58088 7.36613 9.68874 7.20549 9.8499 6.9927C9.87532 6.95913 9.89779 6.91469 9.88848 6.87219L9.85761 6.8649C9.72124 6.90669 9.44381 7.18227 9.33776 7.29641C8.94803 7.7153 8.66596 8.22389 8.51614 8.77784C8.05166 10.5189 9.01382 11.2437 9.29575 12.8239C9.56863 14.3535 7.67753 14.9851 7.83398 16.4802C7.96302 17.713 9.33384 18.5813 9.28212 19.8519C9.08852 21.1923 7.98857 21.9865 8.03917 23.5049C7.75462 23.4076 7.47472 23.2969 7.2004 23.1731C7.25402 21.6941 8.59601 20.7631 8.45255 19.434C8.35213 18.5037 7.21349 17.5022 7.07364 16.5194C6.94212 15.7313 7.58033 15.0241 8.05839 14.4343C9.25174 12.9617 8.06605 11.8452 7.85436 10.3517C7.73389 9.49849 7.91421 8.62973 8.3639 7.89663C8.52594 7.62942 8.70717 7.40269 8.89315 7.15304C8.77497 7.2205 8.66304 7.29849 8.55866 7.38607C7.39074 8.35855 7.01616 10.0362 7.52535 11.4399C7.72179 11.9814 8.07224 12.8546 7.92547 13.4237C7.64549 14.5092 6.29828 15.2181 6.4203 16.4536C6.43486 17.4584 7.87226 18.7175 7.74933 19.6628C7.60608 20.7642 6.66922 21.6309 6.55509 22.8655C6.31631 22.7478 6.08314 22.6188 5.85632 22.4791C5.96075 21.5296 6.74339 20.8964 6.98297 20.001C7.11416 19.5108 6.98745 19.1335 6.74221 18.7109C6.75965 18.8055 6.77585 18.8993 6.78415 18.9953C6.894 20.2653 5.52357 20.9644 5.35084 22.1595C5.04462 21.9538 4.74717 21.7352 4.45932 21.504C4.64444 21.2153 4.75361 21.0577 5.02205 20.8429C4.91605 20.7153 4.8143 20.5841 4.71695 20.4497C4.39913 20.684 4.27921 20.8409 4.0554 21.1601C3.80691 20.9331 3.57895 20.7201 3.34553 20.4768C3.61854 20.1261 3.80066 19.8596 4.22541 19.6963C4.13384 19.5472 4.04331 19.3752 3.95811 19.2205C3.46337 19.4313 3.30482 19.6539 2.95499 20.0488C2.74357 19.8059 2.54093 19.5556 2.34743 19.2982C2.82781 18.9591 2.90167 18.5528 3.62594 18.4563C3.72158 18.7078 3.81064 19.0753 4.13162 19.0633C4.97711 19.0319 5.74386 18.5504 6.34254 17.9815C6.11513 17.575 5.92428 17.18 5.80644 16.7399C5.4408 15.3746 7.03255 14.5978 7.28353 13.4182C7.41691 12.7914 7.03333 11.8735 6.88001 11.2523C6.62862 10.2338 6.82287 9.23698 7.36214 8.34535C7.50321 8.10606 7.67943 7.89917 7.80868 7.68351L7.81689 7.66957C7.62478 7.80041 7.46281 7.94739 7.31159 8.12363C6.4158 9.16756 6.12973 10.4172 6.49683 11.7516C6.62781 12.2276 6.87649 12.9205 6.76185 13.4096C6.6908 13.6586 6.54575 13.8698 6.39598 14.079C5.98053 14.6588 5.41265 15.2057 5.24161 15.9222C5.20633 16.07 5.21354 16.2274 5.22273 16.3754C5.09843 16.4703 5.00885 16.5574 4.87358 16.6493C4.3283 17.0198 3.86886 17.1587 3.22677 17.1963C3.28564 17.4284 3.34989 17.6593 3.4195 17.8885C2.69727 17.9678 2.51685 18.3942 1.98139 18.7627C1.82966 18.5535 1.55974 18.1133 1.44594 17.8819C2.22652 17.696 2.1881 17.0402 3.18523 17.0262C3.13611 16.8116 3.10169 16.5838 3.06517 16.3658C2.02476 16.3162 1.87773 17.1165 1.11323 17.2182C0.965926 16.9064 0.83364 16.5875 0.716841 16.2628C1.59394 16.2305 1.74585 15.7417 2.50281 15.4595C2.65568 15.4025 2.82304 15.3889 2.98464 15.3778C2.97999 15.1186 2.98281 14.8593 2.9931 14.6004C2.00323 14.5954 1.75533 15.1932 0.912788 15.4514C0.779453 15.4923 0.599333 15.4925 0.460859 15.4897C0.368025 15.1645 0.286642 14.8363 0.216873 14.5053C0.417469 14.5161 0.623544 14.5227 0.820963 14.4793C1.76289 14.2722 2.08256 13.6127 3.1134 13.5789C3.15446 13.2787 3.23536 12.9668 3.30971 12.6729C1.84315 12.6491 1.49433 13.8094 0.072156 13.6061C0.0365219 13.3522 0.00340976 12.9982 -0.00359709 12.7437C0.835753 12.802 1.36131 12.5486 2.06861 12.1478C2.59235 11.8509 3.01487 11.7381 3.6163 11.7707C3.709 11.4774 3.93216 11.0509 4.07468 10.7719C3.15118 10.6301 2.53433 10.9146 1.75042 11.3485C1.17222 11.6685 0.649485 11.8135 -0.0152525 11.7441C-0.0298933 11.4152 0.0464324 10.7429 0.0906411 10.4165C0.413134 8.06271 1.41904 5.85742 2.98194 4.07787C4.72479 2.08629 7.06952 0.727636 9.65459 0.211378C10.2652 0.0899316 10.8272 0.029455 11.4458 -0.00850465Z" fill="#007449"/>
+<path d="M11.9927 0.735107C12.0372 0.769511 12.5569 2.01381 12.6387 2.20478L14.2223 2.31197C13.8401 2.63117 13.4139 3.02878 13.0359 3.36473C13.2216 3.83444 13.3903 4.31407 13.576 4.7852C14.2899 4.0218 15.2975 3.66455 16.3105 3.5496C15.8786 4.21725 15.5631 4.82992 15.2991 5.58317C16.0445 5.01888 16.6279 4.80825 17.5537 4.71285C17.4347 4.88522 17.2996 5.0579 17.1776 5.23213C16.964 5.53607 16.7655 5.85058 16.583 6.17449C16.4656 6.38109 16.3678 6.58383 16.2693 6.80019C16.2251 6.87899 16.1729 7.03106 16.0573 6.98207C15.706 6.83315 15.3745 6.6764 15.0126 6.5481C14.0469 6.20455 13.0299 6.02964 12.0057 6.03089C11.1451 6.02867 10.2885 6.15061 9.46218 6.39298C9.13426 6.48907 8.81229 6.60465 8.49796 6.73915C8.35815 6.79861 7.98761 6.99932 7.85265 6.98258C7.77158 6.90266 7.61686 6.54707 7.55172 6.42011C7.46986 6.26029 7.38334 6.10293 7.29226 5.94826C7.03223 5.51631 6.74611 5.10084 6.43555 4.7042C6.5885 4.73723 6.81036 4.75051 6.98646 4.78647C7.68076 4.92829 8.15044 5.16453 8.70739 5.58711C8.41299 4.76514 8.15126 4.27464 7.69344 3.54498C8.70908 3.67954 9.7106 4.00777 10.427 4.78721C10.6062 4.31238 10.7876 3.83847 10.9715 3.36549C10.5769 3.03363 10.1707 2.65443 9.77887 2.3113C10.2942 2.28599 10.8467 2.23804 11.3637 2.20268C11.576 1.74044 11.7915 1.20591 11.9927 0.735107Z" fill="white"/>
+<path d="M12.0016 4.17163C12.1574 4.30588 13.3004 5.11688 13.2654 5.20651C13.2239 5.2238 12.7705 5.15789 12.6861 5.14958C12.4633 5.12697 12.2396 5.11526 12.0156 5.11448C11.6347 5.11545 11.2671 5.14775 10.8906 5.20177C10.8387 5.20923 10.781 5.22388 10.7341 5.20193L10.7324 5.17295C10.7767 5.09177 11.8412 4.29466 12.0016 4.17163Z" fill="#007449"/>
+<path d="M11.909 6.58374C12.8633 6.57219 13.8711 6.97602 14.2586 7.92488C14.2814 7.98073 14.3115 8.04168 14.2878 8.09861C14.2301 8.09758 14.0765 8.04639 14.0109 8.02884C13.7462 7.95798 13.4691 7.94782 13.2 7.9991C12.9059 8.05574 12.656 8.17497 12.4734 8.41165C12.2963 8.64092 12.3038 9.73582 12.5092 9.86718C12.675 9.86337 12.7689 9.43518 12.9196 9.38601C13.0034 9.35868 13.2737 9.48918 13.3965 9.50169C13.5134 9.52141 13.6363 9.51868 13.7525 9.494C13.8852 9.46578 14.0188 9.30546 14.162 9.37491C14.2308 9.40837 14.2975 9.49826 14.3145 9.57285C14.4433 10.1337 14.2356 10.7609 13.9913 11.2657C13.6407 11.9473 13.1221 12.5618 12.3857 12.8054C11.2043 13.1143 10.2466 11.9113 9.85956 10.9236C9.7121 10.5472 9.55818 9.91556 9.69935 9.52316C9.81649 9.19758 10.2243 9.50491 10.4269 9.513C10.6438 9.52001 10.7883 9.4745 10.9835 9.39611C11.1469 9.33051 11.3977 9.50535 11.546 9.58591C11.5816 9.49679 11.6061 9.40356 11.6189 9.30839C11.6493 9.09887 11.655 8.55036 11.5135 8.38257C11.2046 8.01612 10.613 7.91668 10.1606 7.98644C10.0501 8.00347 9.79738 8.10558 9.71799 8.09637L9.70804 8.06589C9.74198 7.84411 9.92721 7.54876 10.0759 7.38604C10.5722 6.84283 11.1974 6.62355 11.909 6.58374Z" fill="white"/>
+<path d="M11.0982 11.2053C11.2369 11.2142 11.4213 11.2463 11.5666 11.2605C11.8484 11.2857 12.1318 11.2865 12.4137 11.2631C12.5254 11.2532 12.9108 11.1594 12.9465 11.2659C12.9059 11.3429 12.7307 11.524 12.6613 11.5994C12.2027 12.0965 11.6435 12.0074 11.2569 11.5003C11.2009 11.4268 11.1216 11.3643 11.0609 11.2813C11.0598 11.2357 11.0595 11.2508 11.0982 11.2053Z" fill="#007449"/>
+<path d="M11.6315 10.4118C11.7868 10.3949 11.8301 10.4393 11.9675 10.4475C12.1479 10.4581 12.3601 10.3389 12.5326 10.481C12.574 10.5152 12.5973 10.5296 12.6028 10.5808C12.5609 10.6497 12.413 10.6896 12.3315 10.7192C12.0808 10.8127 11.9089 10.8154 11.6549 10.7193C11.5668 10.6859 11.3893 10.6564 11.42 10.5333C11.4762 10.4627 11.5486 10.4426 11.6315 10.4118Z" fill="#007449"/>
+<path d="M21.3655 5.87476C21.41 5.88919 21.4644 5.90802 21.4704 5.96069C21.4894 6.13574 21.4628 6.31535 21.4697 6.49142C21.5375 8.20377 22.5862 9.5624 23.6848 10.776C22.3096 11.0943 21.4828 9.70041 19.8254 9.95482C19.7002 9.9837 19.6172 10.0031 19.4945 10.0466C18.8712 9.11876 18.0845 8.31376 17.1733 7.67138C18.2347 7.29616 19.0976 7.42274 20.0475 7.98715C20.153 7.22515 20.693 6.24652 21.3655 5.87476Z" fill="white"/>
+<path d="M2.60115 5.87207C2.66122 5.88631 2.72843 5.92639 2.77765 5.96388C3.43892 6.46764 3.81599 7.18627 3.96037 7.98454C4.14475 7.88073 4.27592 7.80027 4.47508 7.71536C5.222 7.38894 6.06695 7.37441 6.82448 7.67497C5.91517 8.31263 5.13284 9.11668 4.51819 10.0453C4.43498 10.017 4.33042 9.99155 4.24405 9.96818C3.35794 9.78039 2.62972 10.1614 1.85384 10.5202C1.30556 10.7739 0.924517 10.8887 0.321777 10.7783C0.377328 10.7106 0.439967 10.6438 0.499048 10.5785C1.49663 9.47556 2.42877 8.14737 2.52871 6.60984C2.54223 6.40168 2.52464 6.19441 2.5339 5.98667C2.53656 5.92713 2.55786 5.90739 2.60115 5.87207Z" fill="white"/>
+<path d="M10.0958 8.38016C10.527 8.35465 10.9536 8.47708 11.1417 8.90054C11.0098 8.87137 10.8621 8.82288 10.7197 8.79024C10.6789 8.78446 10.6381 8.77909 10.5972 8.77415C10.3093 8.73994 10.0966 8.76072 9.8674 8.9432C9.61132 8.63365 9.72767 8.43798 10.0958 8.38016Z" fill="white"/>
+<path d="M13.6544 8.38156C14.0465 8.32448 14.4765 8.4817 14.1457 8.94187C13.9851 8.81384 13.908 8.7871 13.7055 8.76138C13.3664 8.74745 13.2546 8.8429 13.0134 8.86039C12.913 8.74502 13.0765 8.58472 13.1733 8.53282C13.3411 8.44291 13.4685 8.40557 13.6544 8.38156Z" fill="white"/>
+</g>
+<defs>
+<clipPath id="clip0_1209_136">
+<rect width="24" height="24" rx="12" fill="white"/>
+</clipPath>
+</defs></symbol><symbol id="i-home" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2L3 9V20C3 20.5304 3.21071 21.0391 3.58579 21.4142C3.96086 21.7893 4.46957 22 5 22H8V12C8 11.4477 8.44771 11 9 11H15C15.5523 11 16 11.4477 16 12V22H19C19.5304 22 20.0391 21.7893 20.4142 21.4142C20.7893 21.0391 21 20.5304 21 20V9L12 2ZM14 22V13H10V22H14Z" fill="currentColor"/></symbol><symbol id="i-back" viewBox="0 0 24 24" fill="none"><path d="M9 14L4 9L9 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20V13A4 4 0 0 0 16 9H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="i-drag" viewBox="0 0 24 24" fill="none"><g fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></g></symbol><symbol id="i-link" viewBox="0 0 24 24" fill="none"><path d="M10 13C10.4295 13.5741 10.9774 14.0491 11.6066 14.3929C12.2357 14.7367 12.9315 14.9411 13.6467 14.9923C14.3618 15.0435 15.0796 14.9403 15.7513 14.6897C16.4231 14.4392 17.0331 14.047 17.54 13.54L20.54 10.54C21.4508 9.59695 21.9548 8.33394 21.9434 7.02296C21.932 5.71198 21.4061 4.45791 20.4791 3.53087C19.5521 2.60383 18.298 2.07799 16.987 2.0666C15.676 2.0552 14.413 2.55918 13.47 3.46997L11.75 5.17997" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M14.0002 11C13.5707 10.4259 13.0228 9.9508 12.3936 9.60704C11.7645 9.26328 11.0687 9.05886 10.3535 9.00765C9.63841 8.95643 8.92061 9.05961 8.24885 9.3102C7.5771 9.56079 6.96709 9.95291 6.4602 10.46L3.4602 13.46C2.54941 14.403 2.04544 15.666 2.05683 16.977C2.06822 18.288 2.59407 19.542 3.52111 20.4691C4.44815 21.3961 5.70221 21.922 7.01319 21.9334C8.32418 21.9447 9.58719 21.4408 10.5302 20.53L12.2402 18.82" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol></svg>
+<div class="wrap">
+  <div class="top">
+    <div class="dd"><button class="sq" data-a="open" data-i="C" id="bC" aria-label="Страна"></button><div class="menu" id="mC"></div></div>
+    <div class="dd"><button class="ttl" data-a="open" data-i="T" id="bT"></button><div class="menu" id="mT"></div></div>
+    <button class="sq cp" id="share" aria-label="Скопировать ссылку" title="Скопировать ссылку"></button>
+  </div>
+  <div id="map"></div>
+  <div class="chips sub" id="dy"></div>
+  <div id="list"></div>
+</div>
+<button class="fab" id="fab">+ Точка</button>
+
+<div id="toast"></div>
+<dialog id="dq"><h3 id="qT"></h3><div id="qB"></div><div class="foot"><button class="btn" id="qNo">Отмена</button><button class="btn ok" id="qOk">OK</button></div></dialog>
+
+<dialog id="dlg">
+  <h3 id="fTitle">Новая точка</h3>
+  <div class="row"><div style="flex:1"><label>Город</label><select id="fCity"></select></div><div style="flex:1"><label>День</label><select id="fDay"></select></div></div>
+  <label>Найти место</label>
+  <div class="row"><input id="fQ" placeholder="Например: Rainbow Village"><button class="btn" id="fFind">Найти</button></div>
+  <div class="res" id="fRes"></div>
+  <div class="coord" id="fCoord"></div>
+  <label>Название</label><input id="fName">
+  <label>Тип</label><select id="fType"></select>
+  <label>Описание</label><textarea id="fDesc"></textarea>
+  <label>Часы работы (необязательно)</label><input id="fHours" placeholder="Например: ежедневно 10:00–22:00"><button type="button" class="gb" id="fGh" style="display:none"><svg class="ic"><use href="#i-clock"/></svg> Подтянуть часы из Google</button>
+  <div class="foot"><button class="btn" id="fCancel">Отмена</button><button class="btn ok" id="fSave">Сохранить</button></div>
+</dialog>
+
+<script>
+// Если в браузере сохранён ключ Google — грузим Google Maps до основного кода (иначе остаётся OpenStreetMap).
+(function () {
+  var k = ""; try { k = localStorage.getItem("gm-key") || ""; } catch (e) {}
+  if (!k) k = window.GM_KEY || "";
+  if (!k) return;
+  window.__gmKey = k;
+  window.gm_authFailure = function () {
+    try { localStorage.removeItem("gm-key"); } catch (e) {}
+    alert("Google не принял ключ (проверь, что включены Maps JavaScript, Places и Routes API и нет лишних ограничений). Вернулась карта OpenStreetMap.");
+    location.reload();
+  };
+  document.write('<script src="https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(k) + '&libraries=marker,geometry&v=weekly&language=ru"><\/script>');
+})();
+</script>
+<script>
+// Прослойка: делает из Google Maps «Leaflet» с теми методами, которые использует приложение.
+(function () {
+  if (!(window.google && google.maps && google.maps.geometry && google.maps.marker)) { window.__gmKey = null; return; }
+  var gm = google.maps, ll = function (a) { return Array.isArray(a) ? { lat: a[0], lng: a[1] } : { lat: a.lat, lng: a.lng }; }, iw;
+  window.L = {
+    map: function (id) {
+      var m = new gm.Map(document.getElementById(id), { center: { lat: 24.15, lng: 120.66 }, zoom: 6, mapId: "DEMO_MAP_ID", gestureHandling: "cooperative", streetViewControl: false, mapTypeControl: false, fullscreenControl: false });
+      iw = new gm.InfoWindow();
+      var api = {
+        _m: m,
+        setView: function (c, z) { m.setCenter(ll(c)); m.setZoom(z); return api; },
+        fitBounds: function (pts, o) {
+          var b = new gm.LatLngBounds(); pts.forEach(function (q) { b.extend(ll(q)); });
+          m.fitBounds(b, (o && o.padding && o.padding[0]) || 0);
+          gm.event.addListenerOnce(m, "idle", function () { if (o && o.maxZoom && m.getZoom() > o.maxZoom) m.setZoom(o.maxZoom); });
+          return api;
+        },
+        closePopup: function () { iw.close(); },
+        distance: function (a, b) { return gm.geometry.spherical.computeDistanceBetween(ll(a), ll(b)); },
+        getBounds: function () {
+          var b = m.getBounds(), c = m.getCenter(), ne = b ? b.getNorthEast() : c, sw = b ? b.getSouthWest() : c;
+          return { getWest: function () { return sw.lng(); }, getEast: function () { return ne.lng(); }, getNorth: function () { return ne.lat(); }, getSouth: function () { return sw.lat(); } };
+        },
+        on: function (ev, fn) { if (ev === "click") m.addListener("click", function (e) { fn({ latlng: { lat: e.latLng.lat(), lng: e.latLng.lng() } }); }); return api; }
+      };
+      return api;
+    },
+    tileLayer: function () { var t = { addTo: function () { return t; }, on: function () { return t; } }; return t; },
+    layerGroup: function () {
+      var g = { items: [], map: null, addTo: function (map) { g.map = map._m; return g; }, clearLayers: function () { g.items.forEach(function (i) { i._remove(); }); g.items = []; } };
+      return g;
+    },
+    divIcon: function (o) { return o; },
+    marker: function (pos, o) {
+      var mk, html = o.icon.html, text = "", self = {
+        bindPopup: function (t) { text = t; return self; },
+        getLatLng: function () { return ll(pos); },
+        openPopup: function () { if (mk && text) { iw.setContent(text); iw.open({ map: mk.map, anchor: mk }); } },
+        addTo: function (g) {
+          var el = document.createElement("div"); el.innerHTML = html;
+          var c = el.firstElementChild; c.style.transform = "translateY(50%)";
+          mk = new gm.marker.AdvancedMarkerElement({ map: g.map, position: ll(pos), content: c });
+          mk.addListener("click", self.openPopup);
+          g.items.push(self); return self;
+        },
+        _remove: function () { if (mk) mk.map = null; }
+      };
+      return self;
+    },
+    polyline: function (pts, o) {
+      var pl = null, self = {
+        addTo: function (g) {
+          var dash = o.dashArray, opt = { path: pts.map(ll), strokeColor: o.color, strokeWeight: o.weight, strokeOpacity: dash ? 0 : o.opacity, map: g.map };
+          if (dash) opt.icons = [{ icon: { path: "M 0,-1 0,1", strokeOpacity: o.opacity, strokeColor: o.color, scale: 3 }, offset: "0", repeat: "14px" }];
+          pl = new gm.Polyline(opt);
+          g.items.push(self); return self;
+        },
+        _remove: function () { if (pl) pl.setMap(null); }
+      };
+      return self;
+    }
+  };
+})();
+</script>
+<script>
+const COLORS = ["#8aa23c","#4fb88a","#e08a4b","#5b9bd5","#c76bb0","#d4b44a","#e0605e","#7c7ce0"];
+const ic = n => `<svg class="ic"><use href="#i-${n}"/></svg>`;
+const TYPES = {"🏛️":"Музей","🏙️":"Архитектура","⛩️":"Храм","📚":"Книги","🎨":"Арт","🌳":"Парк","🍜":"Еда","🛍️":"Шопинг","📍":"Другое"};
+const KEY = "trip-v5";
+const DEFAULT = { countries: [
+ { name: "Тайвань", flag: "🇹🇼", cities: [
+  { name: "Тайчжун", before: "Выезд сюда утром", after: "Отъезд из города вечером (около 21–22)", extra: [
+    { t: "Lukang", ll: [24.0574, 120.4344], d: "Старый город, храмы, ремесленные мастерские" },
+    { t: "Gaomei Wetlands", e: "🌳", ll: [24.3108, 120.5497], d: "Закатные болота с ветряками, ехать около часа" },
+    { t: "Starbucks (пример)", e: "sb", ll: [24.1590, 120.6480], d: "Кофе-пауза в центре" }], days: [
+   { name: "День 1", theme: "Деревня и театр", color: COLORS[0], points: [
+    { t: "National Taichung Theater", e: "🏛️", ll: [24.1627, 120.6403], d: "Здание Тойо Ито, знаменито «звуковыми пещерами»" },
+    { t: "邊譜 Bianpu", e: "📚", ll: [24.1655, 120.6425], d: "Независимое книжное кафе, работает до 23:00" },
+    { t: "TSUTAYA Bookstore", e: "📚", ll: [24.1640, 120.6385], d: "Двухэтажный дизайнерский книжный с кафе" },
+    { t: "Rainbow Village", e: "🎨", ll: [24.1327, 120.6139], d: "Старый квартал, расписанный пожилым художником" },
+    { t: "Fengchia Night Market", e: "🛍️", ll: [24.1790, 120.6460], d: "Крупнейший ночной рынок Тайваня" } ] },
+   { name: "День 2", theme: "Центр", color: COLORS[1], points: [
+    { t: "Taichung Confucius Temple", e: "⛩️", ll: [24.1530, 120.6990], d: "Храм эпохи Сун, тихий, почти без туристов" },
+    { t: "Taichung Lecheng Temple", e: "⛩️", ll: [24.1450, 120.6930], d: "Храм богини Мацу 1790 года" },
+    { t: "Cultural Heritage Park", e: "🎨", ll: [24.1315, 120.6865], d: "Бывший пивоваренный завод под арт-пространства" },
+    { t: "Национальный музей изящных искусств", e: "🏛️", ll: [24.1400, 120.6640], d: "Бесплатный вход, сад со скульптурами" },
+    { t: "Artqpie", e: "📚", ll: [24.1445, 120.6615], d: "Арт-книжный с маленькой галереей" },
+    { t: "Starbucks (пример)", e: "sb", ll: [24.1470, 120.6620], d: "Кофе-пауза между музеем и парком" },
+    { t: "Calligraphy Greenway", e: "🌳", ll: [24.1500, 120.6625], d: "Линейный парк-прогулка" } ] } ] },
+  { name: "Тайбэй", extra: [], days: [
+   { name: "День 1", theme: "Классика", color: COLORS[2], points: [
+    { t: "Longshan Temple", e: "⛩️", ll: [25.0372, 121.4999], d: "Один из старейших храмов города" },
+    { t: "Taipei 101", e: "🏛️", ll: [25.0339, 121.5645], d: "Небоскрёб с обзорной площадкой" },
+    { t: "Raohe Night Market", e: "🍜", ll: [25.0510, 121.5775], d: "Ночной рынок с уличной едой" } ] } ] } ] },
+ { name: "Япония", flag: "🇯🇵", cities: [
+  { name: "Токио", extra: [], days: [
+   { name: "День 1", theme: "Асакуса и Сибуя", color: COLORS[3], points: [
+    { t: "Senso-ji", e: "⛩️", ll: [35.7148, 139.7967], d: "Старейший храм Токио" },
+    { t: "Shibuya Crossing", e: "📍", ll: [35.6595, 139.7005], d: "Самый известный перекрёсток" } ] } ] } ] } ] };
+
+let data;
+try { data = JSON.parse(localStorage.getItem(KEY)) || DEFAULT; } catch (e) { data = DEFAULT; }
+const save = () => {
+  if (window.__booted && !window.__applying) { try { localStorage.setItem("trip-ts", Date.now()); } catch (e) {} }
+  if (window.__cloudPush) window.__cloudPush(); try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $ = id => document.getElementById(id);
+const toast = m => { const el = $("toast"); el.textContent = m; el.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove("on"), 2600); };
+function ask(title, fields = [], o = {}) {
+  return new Promise(res => {
+    const dq = $("dq"); let done = false;
+    $("qT").textContent = title;
+    $("qB").innerHTML = (o.text ? `<div style="margin:4px 0 0">${esc(o.text)}</div>` : "") + fields.map((f, i) => `<label>${esc(f.label)}</label>${f.area ? `<textarea id="q${i}" placeholder="${esc(f.ph || "")}">${esc(f.value || "")}</textarea>` : `<input id="q${i}" value="${esc(f.value || "")}" placeholder="${esc(f.ph || "")}">`}`).join("");
+    $("qOk").textContent = o.ok || "OK"; $("qOk").className = "btn " + (o.danger ? "danger" : "ok");
+    const fin = v => { if (done) return; done = true; res(v); if (dq.open) dq.close(); };
+    $("qOk").onclick = () => fin(Object.fromEntries(fields.map((f, i) => [f.k, $("q" + i).value.trim()])));
+    $("qNo").onclick = () => fin(null);
+    dq.onclose = () => fin(null);
+    $("qB").onkeydown = e => { if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") $("qOk").click(); };
+    dq.showModal();
+    const f0 = $("q0"); if (f0) f0.focus();
+  });
+}
+const isSB = p => p.e === "sb" || /starbucks|старбакс/i.test(p.t || "");
+const emo = p => isSB(p) ? "" : (p.e || ic("star"));
+const nums = pts => { let n = 0; return pts.map(p => isSB(p) ? null : ++n); };
+
+let cc = 0, ci = "all", cd = "all", picked = null, picking = false, markers = {}, editing = null;
+const edit = new Set(), vis = new Set();
+const closeMenus = () => document.querySelectorAll(".menu").forEach(m => m.classList.remove("on"));
+const country = () => data.countries[cc];
+const cities = () => country().cities;
+const nextColor = () => COLORS[cities().reduce((n, c) => n + c.days.length, 0) % COLORS.length];
+
+const map = L.map("map", { scrollWheelZoom: false }).setView([24.15, 120.66], 6);
+const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+let tileWarned = false;
+tiles.on("tileerror", () => { if (!tileWarned) { tileWarned = true; toast("Карта не загрузилась. Открой файл в обычном браузере с интернетом."); } });
+const group = L.layerGroup().addTo(map);
+const dist = pts => { let s = 0; for (let i = 1; i < pts.length; i++) s += map.distance(pts[i-1].ll, pts[i].ll); return (s/1000).toFixed(1).replace(".", ","); };
+
+// какие города и дни сейчас видны
+function visible() {
+  const cs = ci === "all" ? cities().map((_, i) => i) : [ci];
+  return cs.map(c => ({ c, ds: ci === "all" || cd === "all" ? cities()[c].days.map((_, i) => i) : [cd] }));
+}
+
+function draw(fit) {
+  group.clearLayers(); markers = {};
+  const all = [];
+  visible().forEach(({ c, ds }) => ds.forEach(d => {
+    const day = cities()[c].days[d]; if (!day) return;
+    const nm = nums(day.points);
+    day.points.forEach((p, j) => {
+      markers[`${c},${d},${j}`] = L.marker(p.ll, { icon: L.divIcon({ className: "", iconSize: [26, 26], html: isSB(p) ? `<div class="mk sb">${ic("sb")}</div>` : `<div class="mk${p.v ? " dn" : ""}" style="background:${day.color}">${p.v ? "✓" : nm[j]}</div>` }) })
+        .bindPopup(`<div class="pp-t">${esc(p.t)}</div>${p.d ? `<div class="pp-d">${esc(p.d)}</div>` : ""}${popHours(p)}`).addTo(group);
+      all.push(p.ll);
+    });
+    const rp = route(c, day), sg = segs(rp);
+    sg.walks.forEach(g => { ensureWalk(g); L.polyline((walk[sigOf(g)]?.path) || g.map(p => p.ll), { color: day.color, weight: 5, opacity: .9 }).addTo(group); });
+    sg.hops.forEach(([a, b]) => { ensureHop(a, b); L.polyline([a.ll, b.ll], { color: day.color, weight: 4, opacity: .9, dashArray: "6 8" }).addTo(group); });
+  }));
+  visible().forEach(({ c }) => {
+    const ho = cities()[c].hotel; if (!ho || !ho.ll) return;
+    markers[`h,${c}`] = L.marker(ho.ll, { icon: L.divIcon({ className: "", iconSize: [26, 26], html: `<div class="mk hotel">${ic("home")}</div>` }) })
+      .bindPopup(`<div class="pp-t">${esc(ho.t)}</div>${ho.d ? `<div class="pp-d">${esc(ho.d)}</div>` : ""}${popHours(ho)}`).addTo(group);
+    all.push(ho.ll);
+  });
+  const xall = [];
+  if (ci === "all" || cd === "all") visible().forEach(({ c }) => (cities()[c].extra || []).forEach((x, k) => {
+    if (!x.ll) return;
+    const days = cities()[c].days;
+    markers[`x,${c},${k}`] = L.marker(x.ll, { icon: L.divIcon({ className: "", iconSize: [26, 26], html: isSB(x) ? `<div class="mk sb">${ic("sb")}</div>` : `<div class="mk xm">${x.v ? "✓" : ic("star")}</div>` }) })
+      .bindPopup(`<div class="pp-t">${esc(x.t)}</div>${x.d ? `<div class="pp-d">${esc(x.d)}</div>` : ""}${popHours(x)}<div style="margin-top:8px">Поставить в день:</div>` + `<div class="pr">` + days.map((dd, di) => `<button class="pb" style="background:${dd.color}" data-a="xassign" data-i="${c},${k},${di}" title="День ${dayNum(c, di)}" aria-label="День ${dayNum(c, di)}">${dayNum(c, di)}</button>`).join("") + `<button class="pb ed" style="background:#ddd" data-a="xedit" data-i="${c},${k}" title="Изменить" aria-label="Изменить">${ic("edit")}</button></div>`).addTo(group);
+    xall.push(x.ll);
+  }));
+  const pts = all.length ? all : xall;
+  if (fit && pts.length) map.fitBounds(pts, { padding: [30, 30], maxZoom: 15 });
+}
+
+function render() {
+  const co = country();
+  closeMenus();
+  const ICON = {
+    chev: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+    copy: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>' };
+  const mi = (a, i, label, on, x = "") => `<button class="mi ${on ? "cur" : ""} ${x}" data-a="${a}" data-i="${i}">${esc(label)}</button>`;
+  $("bC").textContent = co.flag || "🌍";
+  $("bT").innerHTML = esc(ci === "all" ? co.name : cities()[ci].name) + ICON.chev;
+  $("mC").innerHTML = data.countries.map((x, i) => `<div class="mrow">${mi("country", i, (x.flag || "🌍") + "  " + x.name, i === cc)}<button class="mx" data-a="renCountry" data-i="${i}" title="Переименовать">${ic("edit")}</button><button class="mx" data-a="delCountry" data-i="${i}" title="Удалить">${ic("trash")}</button></div>`).join("") + mi("newCountry", "", "+ Страна", false, "sub");
+  $("mT").innerHTML = mi("city", "all", "Все города", ci === "all") + cities().map((x, i) => `<div class="mrow">${mi("city", i, x.name, i === ci)}<button class="mx" data-a="renCity" data-i="${i}" title="Переименовать">${ic("edit")}</button><button class="mx" data-a="delCity" data-i="${i}" title="Удалить">${ic("trash")}</button></div>`).join("") + mi("newCity", "", "+ Город", false, "sub");
+  if (!$("share").innerHTML) $("share").innerHTML = ICON.copy;
+  const chip = (a, i, label, on, ttl = "") => `<button class="chip ${on ? "on" : ""}" data-a="${a}" data-i="${i}" title="${esc(ttl)}" aria-label="${esc(ttl || label)}">${esc(label)}</button>`;
+  $("dy").innerHTML = ci === "all" ? "" : chip("day", "all", "Все", cd === "all", "Все дни") + cities()[ci].days.map((x, i) => `<button class="chip ${i === cd ? "on" : ""}" data-a="day" data-i="${i}" style="--dc:${x.color}">День ${dayNum(ci, i)}</button>`).join("") + `<button class="chip ghost" data-a="newDay" title="Новый день" aria-label="Новый день">+</button>`;
+
+  let h = "";
+  visible().forEach(({ c, ds }) => {
+    const city = cities()[c];
+    if (ci === "all") h += `<h2>${esc(city.name)}</h2>`;
+    if (city.before && (ci === "all" || cd === "all" || cd === 0)) h += `<div class="note nt"><span>${esc(city.before)}</span><button class="mx" data-a="notes" data-i="${c},0" aria-label="Изменить заметку" title="Изменить">${ic("edit")}</button></div>`;
+    ds.forEach(d => {
+      const day = city.days[d]; if (!day) return;
+      const ed = edit.has(`${c},${d}`), vs = vis.has(`${c},${d}`), rp = route(c, day), mp = mapsParts(rp);
+      h += `<section class="day"><div class="head"><span class="pill" style="--dc:${day.color}"><b class="dn">День ${dayNum(c, d)}</b>${mp.length ? `<i class="sep"></i><a class="tl" href="${mp[0]}" target="_blank" rel="noopener" title="Открыть маршрут в Google Картах">${ic("link")}${day.theme ? `<span class="tt">${esc(day.theme)}</span>` : ""}</a>` : day.theme ? `<i class="sep"></i><span class="tt">${esc(day.theme)}</span>` : ""}</span>
+        <div class="right">${(() => { const tot = day.points.filter(q => !isSB(q)).length, got = day.points.filter(q => q.v && !isSB(q)).length; return got || vs ? `<span class="km ${got === tot && tot ? "all" : ""}">✓ ${got}/${tot}</span>` : ""; })()}<span class="km">${distLabel(rp)}</span><button class="ib ${vs ? "on" : ""}" data-a="vis" data-i="${c},${d}" aria-label="Отметить посещённые" title="Отметить посещённые">${ic("check")}</button><button class="ib ${ed ? "on" : ""}" data-a="edit" data-i="${c},${d}" aria-label="Редактировать день" title="Редактировать">${ed ? "✓" : ic("edit")}</button></div></div>`;
+      const nm = nums(day.points);
+      if (city.hotel) h += `<div class="pt"><div class="n hotel">${ic("home")}</div><div class="main" tabindex="0" data-a="go" data-i="h,${c}"><b class="hn">${esc(city.hotel.t)}</b><span>Начало дня${city.hotel.d ? " · " + esc(city.hotel.d) : ""}</span>${city.hotel.h ? `<span class="hrs">${ic("clock")} ${esc(city.hotel.h)}</span>` : ""}${ghRow(city.hotel, ed, "hgh", c)}</div>` + (ed ? `<div class="acts"><button data-a="hedit" data-i="${c}" aria-label="Изменить отель">${ic("edit")}</button><button data-a="hdel" data-i="${c}" aria-label="Убрать отель">${ic("trash")}</button></div>` : "") + `</div>`;
+      h += day.points.map((p, j) => `<div class="pt ${p.v ? "done" : ""}" data-r="${c},${d},${j}">` + (vs ? `<button class="cb ${p.v ? "on" : ""}" data-a="chk" data-i="${c},${d},${j}" role="checkbox" aria-checked="${!!p.v}" aria-label="Посещено">${p.v ? "✓" : ""}</button>` : `<div class="n ${isSB(p) ? "sb" : ""}">${isSB(p) ? ic("sb") : nm[j]}</div>`) + `<div class="main" tabindex="0" data-a="go" data-i="${c},${d},${j}"><b class="${isSB(p) ? "sbn" : ""}">${emo(p)} ${esc(p.t)}</b><span>${esc(p.d)}</span>${p.h ? `<span class="hrs">${ic("clock")} ${esc(p.h)}</span>` : ""}${ghRow(p, ed, "gh", `${c},${d},${j}`)}${hopTag(j ? day.points[j - 1] : city.hotel, p)}</div>` +
+        (ed ? `<div class="acts"><button data-a="pedit" data-i="${c},${d},${j}" aria-label="Изменить">${ic("edit")}</button><button data-a="toX" data-i="${c},${d},${j}" aria-label="В дополнительные места" title="В дополнительные места">${ic("back")}</button><button class="dh" data-a="drag" data-i="${c},${d},${j}" aria-label="Перетащить (или стрелки вверх и вниз)" title="Перетащить">${ic("drag")}</button><button data-a="del" data-i="${c},${d},${j}" aria-label="Удалить">${ic("trash")}</button></div>` : "") + `</div>`).join("");
+      if (ed) h += `<div class="tools"><button data-a="add" data-i="${c},${d}">+ Точка</button><button data-a="rename" data-i="${c},${d}">Тема</button><button data-a="notes" data-i="${c},${d}">Заметки</button><button class="danger" data-a="delDay" data-i="${c},${d}" title="Удалить день" aria-label="Удалить день">${ic("trash")}</button></div>` + (rp.length > 2 ? `<div class="tools"><button data-a="sort" data-i="${c},${d}">⇅ Расставить по ближайшим</button></div>` : "");
+      h += mapsLinks(rp) + `</section>`;
+    });
+    if (city.after && (ci === "all" || cd === "all" || cd === city.days.length - 1)) h += `<div class="note nt"><span>${esc(city.after)}</span><button class="mx" data-a="notes" data-i="${c},0" aria-label="Изменить заметку" title="Изменить">${ic("edit")}</button></div>`;
+    if (ci === "all" || cd === "all") {
+      const xe = edit.has("x" + c), xv = vis.has("x" + c), xs = city.extra || [];
+      h += `<div class="note xbox"><div class="head"><span class="tag">Дополнительные места</span><div class="right"><button class="ib ${xv ? "on" : ""}" data-a="xvis" data-i="${c}" aria-label="Отметить посещённые" title="Отметить посещённые">${ic("check")}</button><button class="ib ${xe ? "on" : ""}" data-a="xtoggle" data-i="${c}" aria-label="Редактировать список" title="Редактировать">${xe ? "✓" : ic("edit")}</button></div></div>` +
+        (xs.length ? xs.map((x, k) => `<div class="pt ${x.v ? "done" : ""}">` + (xv ? `<button class="cb ${x.v ? "on" : ""}" data-a="xchk" data-i="${c},${k}" role="checkbox" aria-checked="${!!x.v}" aria-label="Посещено">${x.v ? "✓" : ""}</button>` : `<div class="n ${isSB(x) ? "sb" : "x"}">${isSB(x) ? ic("sb") : ic("star")}</div>`) + `<div class="main" tabindex="0" data-a="xgo" data-i="${c},${k}"><b class="${isSB(x) ? "sbn" : ""}">${esc(x.t)}</b><span>${esc(x.d)}</span>${x.h ? `<span class="hrs">${ic("clock")} ${esc(x.h)}</span>` : ""}${ghRow(x, xe, "xgh", `${c},${k}`)}</div><div class="acts">${xe ? `<select class="asg" data-a="xsel" data-i="${c},${k}" aria-label="Поставить в день"><option value="">Без дня</option>${city.days.map((dd, di) => `<option value="${di}">${esc(dd.name)}</option>`).join("")}</select><button data-a="xedit" data-i="${c},${k}" aria-label="Изменить">${ic("edit")}</button><button data-a="xdel" data-i="${c},${k}" aria-label="Удалить">${ic("trash")}</button>` : ""}</div></div>`).join("") : `<div class="hint">Пока пусто. Добавь места без дня, потом назначь им день.</div>`) +
+        (xe ? `<div class="tools"><button data-a="xadd" data-i="${c}">+ Место</button></div>` : "") + `</div>`;
+    }
+  });
+  $("list").innerHTML = h;
+}
+const refresh = fit => { render(); draw(fit); save(); };
+// Пешие маршруты Google (Routes API). Хранятся только в памяти и запрашиваются при открытии дня.
+const dayNum = (c, d) => cities().slice(0, c).reduce((n, x) => n + x.days.length, 0) + d + 1;
+const route = (c, day) => cities()[c].hotel ? [cities()[c].hotel, ...day.points] : day.points;
+// Ссылка «Открыть в Google Картах»: ключ не нужен. Промежуточных точек до 3 на телефоне и до 9 на компьютере, длинный день режется на части.
+const mapsParts = rp => {
+  if (rp.length < 2) return [];
+  const W = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 3 : 9, ll = p => p.ll[0].toFixed(6) + "," + p.ll[1].toFixed(6), parts = [];
+  for (let i = 0; i < rp.length - 1; i += W + 1) {
+    const seg = rp.slice(i, i + W + 2), mid = seg.slice(1, -1).map(ll).join("|");
+    parts.push(`https://www.google.com/maps/dir/?api=1&travelmode=walking&origin=${ll(seg[0])}&destination=${ll(seg[seg.length - 1])}` + (mid ? `&waypoints=${encodeURIComponent(mid)}` : ""));
+  }
+  return parts;
+};
+const mapsLinks = rp => { const parts = mapsParts(rp); return parts.length < 2 ? "" : `<div class="gmrow"><span>🧭 Маршрут по частям:</span>` + parts.map((u, i) => `<a class="gmb" href="${u}" target="_blank" rel="noopener">Часть ${i + 1}</a>`).join("") + `</div>`; };
+// Переходы длиннее FAR метров (по прямой) считаются поездкой на транспорте: пунктир на карте, отдельно в километраже.
+const FAR = 5000, km1 = m => (m / 1000).toFixed(1).replace(".", ",");
+function segs(rp) {
+  const walks = [], hops = []; let cur = [];
+  rp.forEach((p, i) => {
+    if (i && map.distance(rp[i - 1].ll, p.ll) > FAR) { if (cur.length > 1) walks.push(cur); hops.push([rp[i - 1], p]); cur = [p]; }
+    else cur.push(p);
+  });
+  if (cur.length > 1) walks.push(cur);
+  return { walks, hops };
+}
+// Время поездки: с ключом Google — Routes API (общественный транспорт, выезд «сейчас»), иначе оценка по прямой (≈25 км/ч с запасом на изгибы).
+const hops = {}, hopKey = (a, b) => a.ll.join() + ">" + b.ll.join();
+const fmtMin = sec => { const m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + " мин" : Math.floor(m / 60) + " ч" + (m % 60 ? " " + (m % 60) + " мин" : ""); };
+const hopTime = (a, b) => { const r = hops[hopKey(a, b)]; return r?.sec != null ? { sec: r.sec, real: true } : { sec: map.distance(a.ll, b.ll) * 1.3 / (25 / 3.6), real: false }; };
+async function ensureHop(a, b) {
+  const k = hopKey(a, b);
+  if (!window.__gmKey || k in hops) return;
+  hops[k] = { wait: true };
+  const wp = p => ({ location: { latLng: { latitude: p.ll[0], longitude: p.ll[1] } } });
+  try {
+    const r = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": window.__gmKey, "X-Goog-FieldMask": "routes.duration" },
+      body: JSON.stringify({ origin: wp(a), destination: wp(b), travelMode: "TRANSIT", languageCode: "ru" }) });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error?.message || r.status);
+    const d = j.routes?.[0]?.duration; hops[k] = d ? { sec: parseInt(d, 10) } : { fail: true };
+  } catch (err) { hops[k] = { fail: true }; toast("Время на транспорте не загрузилось: " + (err.message || err)); }
+  refresh(false);
+}
+function distLabel(rp) {
+  const sg = segs(rp), loaded = sg.walks.length > 0 && sg.walks.every(g => walk[sigOf(g)]?.m != null), parts = [];
+  if (sg.walks.length || !sg.hops.length) parts.push((loaded ? "🚶 " : "🚶≈ ") + km1(sg.walks.reduce((n, g) => n + (loaded ? walk[sigOf(g)].m : plen(g)), 0)) + " км");
+  if (sg.hops.length) { const t = sg.hops.map(([a, b]) => hopTime(a, b)); parts.push("🚌 " + (t.every(x => x.real) ? "" : "≈") + fmtMin(t.reduce((n, x) => n + x.sec, 0))); }
+  return parts.join(" · ");
+}
+const hopTag = (a, b) => { if (!a || map.distance(a.ll, b.ll) <= FAR) return ""; const t = hopTime(a, b); return `<span class="hop">🚌 ${t.real ? "" : "≈"}${fmtMin(t.sec)} от предыдущей, на транспорте</span>`; };
+const walk = {}, sigOf = pts => pts.map(p => p.ll.join()).join("|");
+// Часы работы из Google: по кнопке, хранятся только в памяти (не сохраняются в данных).
+const hoursCache = {}, gid = p => p && /^gm:/.test(p.g || "") ? p.g.slice(3) : null;
+const WD = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+function compactHours(lines) {
+  const t = lines.map(l => { const k = l.indexOf(": "); return (k < 0 ? l : l.slice(k + 2)).replace(/[\u202f\u2009\u00a0]/g, " ").replace(/\s*[–-]\s*/g, "–").trim(); }), runs = [];
+  t.forEach((x, i) => { const r = runs[runs.length - 1]; if (r && r.t === x) r.b = i; else runs.push({ a: i, b: i, t: x }); });
+  return runs.length === 1 ? "Ежедневно " + runs[0].t : runs.map(r => (r.a === r.b ? WD[r.a] : WD[r.a] + "–" + WD[r.b]) + " " + r.t).join(", ");
+}
+async function loadHours(id, quiet) {
+  if (!window.__gmKey || hoursCache[id]) return;
+  try {
+    const r = await fetch("https://places.googleapis.com/v1/places/" + encodeURIComponent(id) + "?languageCode=ru", { headers: { "X-Goog-Api-Key": window.__gmKey, "X-Goog-FieldMask": "regularOpeningHours.weekdayDescriptions" } });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error?.message || r.status);
+    hoursCache[id] = { lines: j.regularOpeningHours?.weekdayDescriptions || [] };
+  } catch (err) { return toast("Часы не загрузились: " + (err.message || err)); }
+  if (!quiet) refresh(false);
+}
+const ghRow = (p, ed, a, i) => ed && gid(p) && window.__gmKey ? `<button class="gb" data-a="${a}" data-i="${i}">${ic("clock")} ${p.h ? "Обновить часы из Google" : "Часы из Google"}</button>` : "";
+const popHours = p => p.h ? `<div class="ph">${ic("clock")} ${esc(p.h)}</div>` : "";
+const ghPop = p => { const c = hoursCache[gid(p)]; return c && c.lines.length ? "<br>🕒 Google:<br>" + c.lines.map(esc).join("<br>") : ""; };
+async function ensureWalk(pts0) {
+  const k = sigOf(pts0);
+  if (!window.__gmKey || pts0.length < 2 || k in walk) return;
+  walk[k] = { wait: true };
+  const wp = p => ({ location: { latLng: { latitude: p.ll[0], longitude: p.ll[1] } } }), pts = pts0.slice(0, 27);
+  try {
+    const r = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": window.__gmKey, "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline" },
+      body: JSON.stringify({ origin: wp(pts[0]), destination: wp(pts[pts.length - 1]), intermediates: pts.slice(1, -1).map(wp), travelMode: "WALK", languageCode: "ru" }) });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error?.message || r.status);
+    const rt = j.routes?.[0]; if (!rt) throw new Error("маршрут не найден");
+    walk[k] = { m: rt.distanceMeters || 0, path: google.maps.geometry.encoding.decodePath(rt.polyline.encodedPolyline).map(q => [q.lat(), q.lng()]) };
+  } catch (err) { walk[k] = { fail: true }; toast("Пешие маршруты недоступны: " + (err.message || err)); }
+  refresh(false);
+}
+
+// ---- действия ----
+document.addEventListener("click", async e => {
+  if (!e.target.closest(".dd")) closeMenus();
+  const t = e.target.closest("[data-a]"); if (!t) return;
+  const a = t.dataset.a, I = (t.dataset.i || "").split(",");
+  const [c, d, j] = I.map(x => x === "all" ? x : +x);
+  const yes = (title, text) => ask(title, [], { text, ok: "Удалить", danger: true });
+  if (a === "open") { const m = $("m" + t.dataset.i), was = m.classList.contains("on"); closeMenus(); if (!was) m.classList.add("on"); return; }
+  closeMenus();
+  if (a === "drag" || a === "noop") return;
+  if (a === "country") { cc = c; ci = "all"; cd = "all"; return refresh(true); }
+  if (a === "city") { ci = c; cd = "all"; return refresh(true); }
+  if (a === "day") { cd = c; return refresh(true); }
+  if (a === "renCountry") {
+    const x = data.countries[c], r = await ask("Страна", [{ k: "n", label: "Название", value: x.name }, { k: "f", label: "Эмодзи флага", value: x.flag || "🌍" }], { ok: "Сохранить" });
+    if (!r) return; if (r.n) x.name = r.n; if (r.f) x.flag = r.f; return refresh(false);
+  }
+  if (a === "delCountry") {
+    if (data.countries.length < 2) return toast("Нельзя удалить последнюю страну");
+    if (!await yes("Удалить страну?", "«" + data.countries[c].name + "» со всеми городами и точками")) return;
+    data.countries.splice(c, 1); cc = 0; ci = "all"; cd = "all"; edit.clear(); vis.clear(); return refresh(true);
+  }
+  if (a === "renCity") {
+    const r = await ask("Город", [{ k: "n", label: "Название", value: cities()[c].name }], { ok: "Сохранить" });
+    if (!r) return; if (r.n) cities()[c].name = r.n; return refresh(false);
+  }
+  if (a === "delCity") {
+    if (!await yes("Удалить город?", "«" + cities()[c].name + "» со всеми днями и точками")) return;
+    cities().splice(c, 1); ci = "all"; cd = "all"; edit.clear(); vis.clear(); return refresh(true);
+  }
+  if (a === "newCountry") {
+    const r = await ask("Новая страна", [{ k: "n", label: "Название" }, { k: "f", label: "Эмодзи флага (необязательно)", ph: "🌍" }, { k: "c", label: "Города (по одному в строке, можно добавить позже)", area: true, ph: "Тайбэй\nТайчжун" }], { ok: "Добавить" });
+    if (!r || !r.n) return;
+    data.countries.push({ name: r.n, flag: r.f || "🌍", cities: [] }); cc = data.countries.length - 1;
+    (r.c || "").split("\n").map(x => x.trim()).filter(Boolean).forEach(n => cities().push({ name: n, extra: [], days: [{ name: "День 1", theme: "", color: nextColor(), points: [] }] }));
+    ci = "all"; cd = "all"; return refresh(true);
+  }
+  if (a === "newCity") {
+    const r = await ask("Новый город", [{ k: "n", label: "Название" }], { ok: "Добавить" });
+    if (!r || !r.n) return;
+    cities().push({ name: r.n, extra: [], days: [{ name: "День 1", theme: "", color: nextColor(), points: [] }] }); ci = cities().length - 1; cd = "all"; return refresh(true);
+  }
+  if (a === "newDay") {
+    const r = await ask("Новый день", [{ k: "th", label: "Тема дня (необязательно)" }], { ok: "Добавить" });
+    if (!r) return;
+    cities()[ci].days.push({ name: "День", theme: r.th, color: nextColor(), points: [] }); cd = cities()[ci].days.length - 1; return refresh(true);
+  }
+  if (a === "vis") { const k = `${c},${d}`; vis.has(k) ? vis.delete(k) : vis.add(k); return refresh(false); }
+  if (a === "edit") { const k = `${c},${d}`; edit.has(k) ? edit.delete(k) : edit.add(k); return refresh(false); }
+  if (a === "go") { const m = markers[t.dataset.i]; if (m) { $("map").scrollIntoView({ behavior: "smooth", block: "center" }); map.setView(m.getLatLng(), 16); m.openPopup(); } return; }
+  if (a === "add") return openForm(c, d);
+  if (a === "xsel") return;
+  if (a === "xtoggle") { const k = "x" + c; edit.has(k) ? edit.delete(k) : edit.add(k); return refresh(false); }
+  if (a === "xgo") { const m = markers["x," + t.dataset.i]; if (m) { $("map").scrollIntoView({ behavior: "smooth", block: "center" }); map.setView(m.getLatLng(), 15); m.openPopup(); } else toast("У этого места нет точки на карте. Нажми ✎ и выбери место."); return; }
+  if (a === "xadd") return openForm(c, "x");
+  if (a === "xedit") return openForm(c, "x", d);
+  if (a === "pedit") return openForm(c, d, j);
+  if (a === "xvis") { const k = "x" + c; vis.has(k) ? vis.delete(k) : vis.add(k); return refresh(false); }
+  if (a === "xchk") { const x = cities()[c].extra[d]; x.v = !x.v; return refresh(false); }
+  if (a === "xdel") { const x = cities()[c].extra[d]; if (!await yes("Удалить место?", "«" + x.t + "»")) return; cities()[c].extra.splice(d, 1); return refresh(false); }
+  if (a === "xassign") { map.closePopup(); assign(c, d, j); return refresh(false); }
+  if (a === "toX") { const city = cities()[c]; city.extra = city.extra || []; city.extra.push(city.days[d].points.splice(j, 1)[0]); return refresh(false); }
+  if (a === "notes") {
+    const city = cities()[c], r = await ask("Заметки к городу", [{ k: "b", label: "Перед первым днём (например: выезд утром)", value: city.before || "" }, { k: "a", label: "После последнего дня", value: city.after || "" }], { ok: "Сохранить" });
+    if (!r) return; city.before = r.b; city.after = r.a; return refresh(false);
+  }
+  const day = cities()[c].days[d];
+  if (a === "rename") {
+    const r = await ask("Тема дня", [{ k: "th", label: "Тема дня (необязательно)", value: day.theme || "" }], { ok: "Сохранить" });
+    if (!r) return; day.theme = r.th; return refresh(false);
+  }
+  if (a === "delDay") {
+    if (!await yes("Удалить день?", "«День " + dayNum(c, d) + "» вместе со всеми точками")) return;
+    cities()[c].days.splice(d, 1); edit.clear(); vis.clear(); cd = "all"; return refresh(true);
+  }
+  if (a === "gh" || a === "xgh" || a === "hgh") {   // часы Google сохраняем в точку текстом, дальше они не обновляются
+    const city = cities()[c], p = a === "gh" ? city.days[d]?.points[j] : a === "xgh" ? city.extra[d] : city.hotel, id = gid(p);
+    if (!id) return;
+    await loadHours(id, true); const hc = hoursCache[id]; if (!hc) return;
+    if (!hc.lines.length) return toast("У Google нет часов для этого места");
+    p.h = compactHours(hc.lines); return refresh(false);
+  }
+  if (a === "hedit") return openForm(c, "h", 0);
+  if (a === "hdel") {
+    if (!await ask("Убрать отель?", [], { text: "Дни снова будут начинаться с первой точки.", ok: "Убрать", danger: true })) return;
+    delete cities()[c].hotel; return refresh(true);
+  }
+  if (a === "sort") {
+    const hot = cities()[c].hotel, pts = day.points, arr = hot ? [hot, ...pts] : pts, res = order(arr), km = v => (v / 1000).toFixed(1).replace(".", ",");
+    if (arr.length < 3) return;
+    if (plen(res) >= plen(arr) - 1) return toast("Короче уже не получится");
+    if (!await ask("Расставить по ближайшим?", [], { text: `${hot ? "Отель остаётся стартом дня" : "Первая точка останется на месте"}. Путь по прямой: ${km(plen(arr))} км → ${km(plen(res))} км.`, ok: "Расставить" })) return;
+    day.points = hot ? res.slice(1) : res; return refresh(false);
+  }
+  if (a === "chk") { const p = day.points[j]; p.v = !p.v; return refresh(false); }
+  if (a === "del") { if (!await yes("Удалить точку?", "«" + day.points[j].t + "»")) return; day.points.splice(j, 1); return refresh(false); }
+  if (a === "up" || a === "dn") { const k = a === "up" ? j - 1 : j + 1, pp = day.points; if (k < 0 || k >= pp.length) return; [pp[j], pp[k]] = [pp[k], pp[j]]; return refresh(false); }
+});
+function assign(c, k, d) { const city = cities()[c], [p] = city.extra.splice(k, 1); city.days[d].points.push(p); }
+document.addEventListener("change", e => {
+  const t = e.target.closest('[data-a="xsel"]'); if (!t || t.value === "") return;
+  const [c, k] = t.dataset.i.split(",").map(Number); assign(c, k, +t.value); refresh(false);
+});
+document.addEventListener("keydown", e => { if (e.key === "Enter" && (e.target.dataset?.a === "go" || e.target.dataset?.a === "xgo")) e.target.click(); });
+
+// ---- порядок точек: «по ближайшим» и перетаскивание ----
+const plen = pts => { let s = 0; for (let i = 1; i < pts.length; i++) s += map.distance(pts[i - 1].ll, pts[i].ll); return s; };
+function order(pts) {
+  if (pts.length < 3) return pts.slice();
+  const D = (a, b) => map.distance(a.ll, b.ll), left = pts.slice(1), path = [pts[0]];
+  while (left.length) {
+    const last = path[path.length - 1]; let bi = 0, bd = Infinity;
+    left.forEach((p, i) => { const x = D(last, p); if (x < bd) { bd = x; bi = i; } });
+    path.push(left.splice(bi, 1)[0]);
+  }
+  for (let better = true, guard = 0; better && guard < 200; guard++) {   // 2-opt, первая точка закреплена
+    better = false;
+    for (let i = 1; i < path.length - 1; i++) for (let k = i + 1; k < path.length; k++) {
+      const a = path[i - 1], b = path[i], c = path[k], d = path[k + 1];
+      if (D(a, c) + (d ? D(b, d) : 0) < D(a, b) + (d ? D(c, d) : 0) - 1) { path.splice(i, k - i + 1, ...path.slice(i, k + 1).reverse()); better = true; }
+    }
+  }
+  return path;
+}
+let drag = null;
+document.addEventListener("pointerdown", e => {
+  const h = e.target.closest('[data-a="drag"]'); if (!h || e.button > 0) return;
+  const row = h.closest(".pt"), rows = [...row.closest(".day").querySelectorAll(".pt[data-r]")], sy = window.scrollY;
+  drag = { row, rows, from: rows.indexOf(row), to: rows.indexOf(row), id: e.pointerId, y: e.clientY, y0: e.clientY + sy,
+    hgt: row.getBoundingClientRect().height, r: row.dataset.r.split(",").map(Number),
+    mids: rows.map(r => { const b = r.getBoundingClientRect(); return b.top + sy + b.height / 2; }) };
+  try { h.setPointerCapture(e.pointerId); } catch (_) {}
+  row.classList.add("dragging"); document.body.classList.add("dragging");
+  e.preventDefault(); dragTick();
+});
+document.addEventListener("pointermove", e => { if (drag && e.pointerId === drag.id) { drag.y = e.clientY; e.preventDefault(); } }, { passive: false });
+function dragTick() {
+  const g = drag; if (!g) return;
+  const H = window.innerHeight;
+  if (g.y < 70) window.scrollBy(0, -(70 - g.y) / 4 - 2); else if (g.y > H - 70) window.scrollBy(0, (g.y - (H - 70)) / 4 + 2);
+  const py = g.y + window.scrollY;
+  g.row.style.transform = `translateY(${py - g.y0}px)`;
+  g.to = g.mids.filter((m, k) => k !== g.from && m < py).length;
+  g.rows.forEach((r, k) => {
+    if (k === g.from) return;
+    const sh = g.from < g.to && k > g.from && k <= g.to ? -g.hgt : g.from > g.to && k >= g.to && k < g.from ? g.hgt : 0;
+    r.style.transform = sh ? `translateY(${sh}px)` : "";
+  });
+  requestAnimationFrame(dragTick);
+}
+function dragEnd(e) {
+  const g = drag; if (!g || e.pointerId !== g.id) return;
+  drag = null; document.body.classList.remove("dragging");
+  if (e.type === "pointerup" && g.to !== g.from) {
+    const pts = cities()[g.r[0]].days[g.r[1]].points; pts.splice(g.to, 0, pts.splice(g.from, 1)[0]); refresh(false);
+  } else { g.rows.forEach(r => r.style.transform = ""); g.row.classList.remove("dragging"); }
+}
+document.addEventListener("pointerup", dragEnd); document.addEventListener("pointercancel", dragEnd);
+document.addEventListener("keydown", e => {   // с клавиатуры: фокус на ⠿ и стрелки вверх/вниз
+  const h = e.target.closest?.('[data-a="drag"]'); if (!h || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+  e.preventDefault();
+  const [c, d, j] = h.dataset.i.split(",").map(Number), pts = cities()[c].days[d].points, k = e.key === "ArrowUp" ? j - 1 : j + 1;
+  if (k < 0 || k >= pts.length) return;
+  [pts[j], pts[k]] = [pts[k], pts[j]]; refresh(false);
+  document.querySelector(`[data-a="drag"][data-i="${c},${d},${k}"]`)?.focus();
+});
+
+// ---- форма добавления точки ----
+const allTypes = () => ({ ...TYPES, ...(data.types || {}) });
+function fillTypes() {
+  $("fType").innerHTML = '<option value="">★ Без типа</option>' + Object.entries(allTypes()).map(([e, n]) => `<option value="${e}">${e} ${esc(n)}</option>`).join("") + '<option value="sb">★ Starbucks</option><option value="hotel">🏠 Отель (старт каждого дня)</option><option value="__new">➕ Новый тип…</option>';
+}
+fillTypes();
+$("fType").onchange = async () => {
+  if ($("fType").value !== "__new") return;
+  const r = await ask("Новый тип точки", [{ k: "e", label: "Эмодзи", ph: "🎭" }, { k: "n", label: "Название", ph: "Театр" }], { ok: "Добавить" });
+  const em = r && r.e ? (window.Intl && Intl.Segmenter ? [...new Intl.Segmenter().segment(r.e)][0].segment : [...r.e][0]) : "";
+  if (!em || !r.n) { $("fType").value = ""; return; }
+  (data.types = data.types || {})[em] = r.n; save(); fillTypes(); $("fType").value = em;
+};
+const fillDays = () => { $("fDay").innerHTML = (cities()[+$("fCity").value]?.days || []).map((d, i) => `<option value="${i}">День ${dayNum(+$("fCity").value, i)}${d.theme ? " · " + esc(d.theme) : ""}</option>`).join("") + '<option value="new">➕ Новый день</option><option value="x">Без дня (дополнительные места)</option>'; };
+$("fCity").onchange = fillDays;
+let pickedId = null;
+const syncGh = () => { $("fGh").style.display = window.__gmKey && /^gm:/.test(pickedId || "") ? "" : "none"; };
+$("fGh").onclick = async () => {
+  const id = pickedId.slice(3); await loadHours(id, true); const c = hoursCache[id]; if (!c) return;
+  c.lines.length ? ($("fHours").value = compactHours(c.lines)) : toast("У Google нет часов для этого места");
+};
+function setPicked(ll, name, id) { picked = ll; pickedId = id || null; syncGh(); $("fCoord").textContent = "Место выбрано: " + ll[0].toFixed(4) + ", " + ll[1].toFixed(4); if (name && !$("fName").value) $("fName").value = name; }
+function openForm(c, d, j) {
+  if (!cities().length) return toast("Сначала добавь город: меню города, «+ Город».");
+  editing = j !== undefined ? { c, d, j } : null;
+  c = c ?? (ci === "all" ? 0 : ci);
+  $("fCity").innerHTML = cities().map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join("");
+  $("fCity").value = c; fillDays();
+  $("fDay").value = String(d ?? (cd === "all" ? "x" : cd));
+  const p = editing ? (d === "x" ? cities()[c].extra[j] : d === "h" ? cities()[c].hotel : cities()[c].days[d].points[j]) : null;
+  $("fTitle").textContent = p ? "Изменить точку" : "Новая точка";
+  $("fQ").value = ""; $("fRes").innerHTML = ""; $("fName").value = p?.t || ""; $("fDesc").value = p?.d || ""; $("fHours").value = p?.h || ""; $("fType").value = d === "h" ? "hotel" : (p?.e || ""); picked = p?.ll || null; pickedId = p?.g || null; syncGh();
+  $("fCoord").innerHTML = (picked ? "Место: " + picked[0].toFixed(4) + ", " + picked[1].toFixed(4) + ". Изменить: найди выше или " : "Место не выбрано. Найди его выше или ") + '<a href="#" id="fPick" style="color:#f59e0b">отметь на карте</a>.';
+  $("dlg").showModal();
+}
+$("fab").onclick = () => openForm();
+$("fCancel").onclick = () => $("dlg").close();
+// Поставщик поиска мест. Сейчас OpenStreetMap (Nominatim); позже сюда встанет Google Places.
+// Контракт: search(q, bounds) -> [{ name, label, ll: [lat, lng], id }], где id вида "osm:node:123" или "gm:<place_id>".
+const geo = {
+  async google(q, b) {
+    const r = await fetch("https://places.googleapis.com/v1/places:searchText", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": window.__gmKey, "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location" },
+      body: JSON.stringify({ textQuery: q, languageCode: "ru", pageSize: 5, locationBias: { rectangle: { low: { latitude: b.getSouth(), longitude: b.getWest() }, high: { latitude: b.getNorth(), longitude: b.getEast() } } } }) });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error?.message || r.status);
+    return (j.places || []).map(x => ({ name: x.displayName?.text || "", label: (x.displayName?.text || "") + ", " + (x.formattedAddress || ""), ll: [x.location.latitude, x.location.longitude], id: "gm:" + x.id }));
+  },
+  async search(q, b) {
+    if (window.__gmKey) return geo.google(q, b);
+    const url = "https://nominatim.openstreetmap.org/search?format=json&limit=5&accept-language=ru&viewbox=" + [b.getWest(), b.getNorth(), b.getEast(), b.getSouth()].join(",") + "&q=" + encodeURIComponent(q);
+    const r = await (await fetch(url)).json();
+    return r.map(x => ({ name: x.display_name.split(",")[0], label: x.display_name, ll: [+x.lat, +x.lon], id: x.osm_type && x.osm_id ? `osm:${x.osm_type}:${x.osm_id}` : null }));
+  }
+};
+$("fFind").onclick = async () => {
+  const q = $("fQ").value.trim(); if (!q) return;
+  $("fRes").innerHTML = "<div>Ищу…</div>";
+  try {
+    const r = await geo.search(q, map.getBounds());
+    $("fRes").innerHTML = r.length ? r.map((x, i) => `<div data-r="${i}">${esc(x.label)}</div>`).join("") : "<div>Ничего не найдено. Попробуй другое название или отметь на карте.</div>";
+    $("fRes").onclick = ev => { const el = ev.target.closest("[data-r]"); if (!el) return; const x = r[+el.dataset.r]; setPicked(x.ll, x.name, x.id); };
+  } catch (err) { $("fRes").innerHTML = "<div>Поиск не сработал. Проверь интернет или отметь точку на карте.</div>"; }
+};
+$("fQ").onkeydown = e => { if (e.key === "Enter") $("fFind").click(); };
+$("dlg").addEventListener("click", e => {
+  if (e.target.id === "fPick") { e.preventDefault(); picking = true; $("dlg").close(); $("map").classList.add("pick"); $("map").scrollIntoView({ behavior: "smooth", block: "center" }); }
+});
+map.on("click", e => { if (!picking) return; picking = false; $("map").classList.remove("pick"); $("dlg").showModal(); setPicked([e.latlng.lat, e.latlng.lng]); });
+$("fSave").onclick = () => {
+  if (!picked) return toast("Сначала выбери место: найди его или отметь на карте.");
+  const c = +$("fCity").value, name = $("fName").value.trim() || "Без названия"; let dv = $("fDay").value;
+  const pt = { t: name, e: /starbucks|старбакс/i.test(name) ? "sb" : $("fType").value, ll: picked, d: $("fDesc").value.trim(), h: $("fHours").value.trim() };
+  if (pickedId) pt.g = pickedId;
+  if (dv === "new" && $("fType").value !== "hotel") { cities()[c].days.push({ name: "День", theme: "", color: nextColor(), points: [] }); dv = String(cities()[c].days.length - 1); }
+  const box = (cc_, v) => v === "x" ? (cities()[cc_].extra = cities()[cc_].extra || []) : cities()[cc_].days[+v].points;
+  let moved = true;
+  if (editing && editing.d === "h") { delete cities()[editing.c].hotel; editing = null; }
+  if ($("fType").value === "hotel") {
+    if (editing) box(editing.c, String(editing.d)).splice(editing.j, 1);
+    pt.e = "hotel"; cities()[c].hotel = pt;
+    $("dlg").close(); if (ci !== c) { ci = c; cd = "all"; } return refresh(true);
+  }
+  if (editing) {
+    const old = box(editing.c, String(editing.d));
+    const o = old[editing.j];   // сохраняем все остальные поля точки (отметка «посещено» и т. п.)
+    if (o) for (const k of Object.keys(o)) if (!(k in pt) && k !== "g") pt[k] = o[k];
+    if (editing.c === c && String(editing.d) === dv) { old[editing.j] = pt; moved = false; }
+    else { old.splice(editing.j, 1); box(c, dv).push(pt); }
+  } else box(c, dv).push(pt);
+  $("dlg").close();
+  if (moved) { ci = c; cd = dv === "x" ? "all" : +dv; }
+  refresh(moved);
+};
+
+// ---- поделиться: данные кодируются прямо в ссылку ----
+const enc = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const dec = s => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
+$("share").onclick = async () => {
+  const co = country(), p = { n: co.name, f: co.flag, c: ci === "all" ? co.cities : [co.cities[ci]] };
+  const url = location.href.split("#")[0] + "#share=" + enc(JSON.stringify(p));
+  const title = ci === "all" ? `${co.flag} ${co.name}` : `${co.flag} ${co.name} · ${co.cities[ci].name}`;
+  const btn = $("share"), old = btn.innerHTML;
+  try { await navigator.clipboard.writeText(url); btn.textContent = "✓"; btn.style.fontSize = "20px"; setTimeout(() => { btn.innerHTML = old; btn.style.fontSize = ""; }, 1500); }
+  catch (e) { ask("Скопируй ссылку", [{ k: "u", label: title, value: url }], { ok: "Готово" }); }
+};
+async function importShared() {
+  if (!location.hash.startsWith("#share=")) return;
+  try {
+    const p = JSON.parse(dec(location.hash.slice(7)));
+    if (await ask("Добавить маршрут?", [], { text: `${p.f} ${p.n} (${p.c.map(x => x.name).join(", ")})`, ok: "Добавить" })) {
+      let co = data.countries.find(x => x.name === p.n);
+      if (!co) data.countries.push(co = { name: p.n, flag: p.f, cities: [] });
+      p.c.forEach(city => { const k = co.cities.findIndex(x => x.name === city.name); k >= 0 ? co.cities[k] = city : co.cities.push(city); });
+      cc = data.countries.indexOf(co); ci = "all"; cd = "all"; refresh(true);
+    }
+  } catch (e) { toast("Не удалось открыть ссылку."); }
+  history.replaceState(null, "", location.href.split("#")[0]);
+}
+importShared();
+refresh(true);
+window.__booted = true;   // дальше любое сохранение считается правкой пользователя
+(function () {
+  const on = !!window.__gmKey;
+  $("map").insertAdjacentHTML("afterend", `<div id="gk" style="font-size:12px;color:#888;margin:6px 2px">Карта: ${on ? "Google" : "OpenStreetMap"} · <a href="#" id="gkb" style="color:#8ab4f8">${on ? "сменить ключ" : "подключить Google"}</a> · <span id="cl"></span></div>`);
+  $("list").insertAdjacentHTML("afterend", `<div id="foot" style="font-size:12px;color:#888;text-align:center;margin-top:28px">Резервная копия: <a href="#" id="gkx" style="color:#8ab4f8">сохранить в файл</a> · <a href="#" id="gki" style="color:#8ab4f8">загрузить из файла</a><input type="file" id="gkf" accept=".json,application/json" hidden></div>`);
+  $("gkb").onclick = e => {
+    e.preventDefault();
+    const k = prompt("Вставь ключ Google Maps API (пусто — вернуться на OpenStreetMap):", "");
+    if (k === null) return;
+    try { k.trim() ? localStorage.setItem("gm-key", k.trim()) : localStorage.removeItem("gm-key"); } catch (_) {}
+    location.reload();
+  };
+  $("gkx").onclick = e => {   // резервная копия: все страны, города, дни, точки и свои типы (ключ Google в файл не попадает)
+    e.preventDefault();
+    const blob = new Blob([JSON.stringify({ app: "marshrut", version: 1, saved: new Date().toISOString(), data }, null, 1)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "marshrut-" + new Date().toISOString().slice(0, 10) + ".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast("Файл сохранён");
+  };
+  $("gki").onclick = e => { e.preventDefault(); $("gkf").click(); };
+  $("gkf").onchange = async () => {
+    const f = $("gkf").files[0]; $("gkf").value = ""; if (!f) return;
+    let j; try { j = JSON.parse(await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsText(f); })); } catch (_) { return toast("Не удалось прочитать файл"); }
+    const d = j && j.app === "marshrut" ? j.data : j;
+    if (!d || !Array.isArray(d.countries) || !d.countries.length || !d.countries.every(k => Array.isArray(k.cities) && k.cities.every(c => Array.isArray(c.days)))) return toast("Это не файл с маршрутами");
+    const n = d.countries.reduce((a, k) => a + k.cities.length, 0);
+    if (!await ask("Загрузить данные из файла?", [], { text: `В файле стран: ${d.countries.length}, городов: ${n}. Текущие данные будут заменены. Если они нужны, сначала сохраните их в файл.`, ok: "Заменить", danger: true })) return;
+    d.countries.forEach(k => k.cities.forEach(c => { c.extra = c.extra || []; c.days.forEach(x => { x.points = x.points || []; }); }));
+    data = d; cc = 0; ci = "all"; cd = "all"; edit.clear(); vis.clear(); fillTypes(); refresh(true); toast("Данные загружены");
+  };
+})();
+// Адаптер Firebase (SDK подгружается по требованию). База данных: именованная, "marshrut".
+const FB_DB = "(default)";   // имя базы в Firebase; если база создана как "(default)", впишите сюда (default)
+const FB_ID = FB_DB === "(default)" ? undefined : FB_DB;
+async function realFb() {
+  const B = "https://www.gstatic.com/firebasejs/10.14.1/";
+  const [{ initializeApp }, A, F] = await Promise.all([import(B + "firebase-app.js"), import(B + "firebase-auth.js"), import(B + "firebase-firestore.js")]);
+  const app = initializeApp({ apiKey: "AIzaSyAOXNkirc_5neewkPMG_aesetjLkZmGJ6o", authDomain: "marshrut-74a22.firebaseapp.com", projectId: "marshrut-74a22", storageBucket: "marshrut-74a22.firebasestorage.app", messagingSenderId: "342044698056", appId: "1:342044698056:web:6b8088545b6d0852a20cfd" });
+  const auth = A.getAuth(app); let db;
+  try { db = F.initializeFirestore(app, { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }, FB_ID); }   // работа без интернета
+  catch (_) { db = F.getFirestore(app, FB_ID); }
+  return {
+    onAuth: cb => A.onAuthStateChanged(auth, cb),
+    signIn: () => A.signInWithPopup(auth, new A.GoogleAuthProvider()),
+    signInRedirect: () => A.signInWithRedirect(auth, new A.GoogleAuthProvider()),
+    signOut: () => A.signOut(auth),
+    doc: uid => { const r = F.doc(db, "users", uid); return { set: x => F.setDoc(r, x), onSnapshot: (ok, err) => F.onSnapshot(r, sn => ok({ exists: sn.exists(), metadata: sn.metadata, data: () => sn.data() }), err) }; }
+  };
+}
+// ---- облако: вход через Google и синхронизация (Firebase) ----
+(async function () {
+  const TS = "trip-ts", SY = "trip-sync", num = k => +(localStorage.getItem(k) || 0), ui = $("cl");
+  ui.textContent = "☁ загрузка…";
+  let fb; try { fb = window.__fb || await realFb(); } catch (e) { ui.textContent = "☁ Облако недоступно (нет интернета?)"; return; }
+  let user = null, ref = null, off = null, timer = null, state = "";
+  const lnk = (id, t) => `<a href="#" id="${id}" style="color:#8ab4f8">${t}</a>`;
+  function draw() {
+    const st = { saving: "сохраняю…", ok: "синхронизировано", err: "нет связи, сохранится позже" }[state] || "";
+    ui.innerHTML = user ? `☁ ${esc(user.email || "")}${st ? " · " + st : ""} · ${lnk("clout", "выйти")}` : `☁ ${lnk("clin", "войти через Google")}`;
+    if ($("clin")) $("clin").onclick = e => {
+      e.preventDefault();
+      if (location.protocol === "file:") return toast("Вход работает только на опубликованном сайте, не из файла");
+      fb.signIn().catch(err => {
+        if (err.code === "auth/popup-blocked") fb.signInRedirect();
+        else if (err.code !== "auth/popup-closed-by-user" && err.code !== "auth/cancelled-popup-request") toast("Не удалось войти: " + (err.code || err.message));
+      });
+    };
+    if ($("clout")) $("clout").onclick = e => { e.preventDefault(); fb.signOut(); };
+  }
+  const valid = d => d && Array.isArray(d.countries) && d.countries.length && d.countries.every(k => Array.isArray(k.cities) && k.cities.every(c => Array.isArray(c.days)));
+  function adopt(c) {   // взять данные из облака
+    let d; try { d = JSON.parse(c.json); } catch (_) { return; } if (!valid(d)) return;
+    d.countries.forEach(k => k.cities.forEach(x => { x.extra = x.extra || []; x.days.forEach(y => { y.points = y.points || []; }); }));
+    window.__applying = true;
+    data = d; cc = Math.min(cc, d.countries.length - 1); ci = "all"; cd = "all"; edit.clear(); vis.clear(); fillTypes(); refresh(true);
+    window.__applying = false;
+    localStorage.setItem(TS, c.updated); localStorage.setItem(SY, c.updated);
+  }
+  function push() {
+    if (!ref) return; const ts = num(TS) || Date.now(); state = "saving"; draw();
+    ref.set({ json: JSON.stringify(data), updated: ts, v: 1 }).then(() => { localStorage.setItem(SY, ts); state = "ok"; draw(); }).catch(() => { state = "err"; draw(); });
+  }
+  window.__cloudPush = () => { if (!ref || window.__applying) return; clearTimeout(timer); timer = setTimeout(push, 1500); };
+  async function onDoc(snap) {
+    if (snap.metadata && snap.metadata.hasPendingWrites) return;   // это наша запись
+    const local = num(TS), synced = num(SY);
+    if (!snap.exists) { if (local > 0) push(); else { state = "ok"; draw(); } return; }
+    const c = snap.data();
+    if (c.updated === local) { localStorage.setItem(SY, c.updated); state = "ok"; draw(); return; }
+    const cloudNew = c.updated > synced, localNew = local > synced;
+    if (cloudNew && localNew) {
+      if (await ask("Данные расходятся", [], { text: "В облаке и на этом устройстве разные изменения. «Заменить» возьмёт данные из облака, «Отмена» оставит данные этого устройства и обновит облако.", ok: "Заменить", danger: true })) adopt(c); else push();
+    } else if (cloudNew) adopt(c);
+    else if (localNew) push();
+    state = "ok"; draw();
+  }
+  fb.onAuth(u => {
+    if (off) { off(); off = null; }
+    user = u; ref = u ? fb.doc(u.uid) : null; state = "";
+    if (ref) off = ref.onSnapshot(onDoc, () => { state = "err"; draw(); });
+    draw();
+  });
+  draw();
+})();
+</script>
+</body>
+</html>
