@@ -359,7 +359,7 @@ function ask(title, fields = [], o = {}) {
   return new Promise(res => {
     const dq = $("dq"); let done = false;
     $("qT").textContent = title;
-    $("qB").innerHTML = (o.text ? `<div style="margin:4px 0 0">${esc(o.text)}</div>` : "") + fields.map((f, i) => `<label>${esc(f.label)}</label>${f.area ? `<textarea id="q${i}" placeholder="${esc(f.ph || "")}">${esc(f.value || "")}</textarea>` : `<input id="q${i}" value="${esc(f.value || "")}" placeholder="${esc(f.ph || "")}">`}`).join("");
+    $("qB").innerHTML = (o.text ? `<div style="margin:4px 0 0">${esc(o.text)}</div>` : "") + fields.map((f, i) => `<label>${esc(f.label)}</label>${f.area ? `<textarea id="q${i}" placeholder="${esc(f.ph || "")}">${esc(f.value || "")}</textarea>` : `<input id="q${i}" type="${f.pw ? "password" : "text"}" ${f.pw ? 'autocomplete="current-password"' : ""} value="${esc(f.value || "")}" placeholder="${esc(f.ph || "")}">`}`).join("");
     $("qOk").textContent = o.ok || "OK"; $("qOk").className = "btn " + (o.danger ? "danger" : "ok");
     const fin = v => { if (done) return; done = true; res(v); if (dq.open) dq.close(); };
     $("qOk").onclick = () => fin(Object.fromEntries(fields.map((f, i) => [f.k, $("q" + i).value.trim()])));
@@ -888,6 +888,8 @@ async function realFb() {
     onAuth: cb => A.onAuthStateChanged(auth, cb),
     signIn: () => A.signInWithPopup(auth, new A.GoogleAuthProvider()),
     signInRedirect: () => A.signInWithRedirect(auth, new A.GoogleAuthProvider()),
+    emailIn: (e, p) => A.signInWithEmailAndPassword(auth, e, p),
+    emailNew: (e, p) => A.createUserWithEmailAndPassword(auth, e, p),
     signOut: () => A.signOut(auth),
     doc: uid => { const r = F.doc(db, "users", uid); return { set: x => F.setDoc(r, x), onSnapshot: (ok, err) => F.onSnapshot(r, sn => ok({ exists: sn.exists(), metadata: sn.metadata, data: () => sn.data() }), err) }; }
   };
@@ -901,7 +903,7 @@ async function realFb() {
   const lnk = (id, t) => `<a href="#" id="${id}" style="color:#8ab4f8">${t}</a>`;
   function draw() {
     const st = { saving: "сохраняю…", ok: "синхронизировано", err: "нет связи, сохранится позже" }[state] || "";
-    ui.innerHTML = user ? `☁ ${esc(user.email || "")}${st ? " · " + st : ""} · ${lnk("clout", "выйти")}` : `☁ ${lnk("clin", "войти через Google")}`;
+    ui.innerHTML = user ? `☁ ${esc(user.email || "")}${st ? " · " + st : ""} · ${lnk("clout", "выйти")}` : `☁ ${lnk("clin", "войти через Google")} · ${lnk("clpw", "по паролю")} · ${lnk("clnew", "создать вход по паролю")}`;
     if ($("clin")) $("clin").onclick = e => {
       e.preventDefault();
       if (location.protocol === "file:") return toast("Вход работает только на опубликованном сайте, не из файла");
@@ -910,6 +912,17 @@ async function realFb() {
         else if (err.code !== "auth/popup-closed-by-user" && err.code !== "auth/cancelled-popup-request") toast("Не удалось войти: " + (err.code || err.message));
       });
     };
+    const pwFlow = async create => {
+      const r = await ask(create ? "Создать вход по паролю" : "Вход по паролю", [{ k: "e", label: "Почта" }, { k: "p", label: "Пароль (не короче 6 символов)", pw: true }], { ok: create ? "Создать" : "Войти" });
+      if (!r || !r.e || !r.p) return;
+      try { await (create ? fb.emailNew : fb.emailIn)(r.e.trim(), r.p); }
+      catch (err) {
+        const m = { "auth/invalid-credential": "Неверная почта или пароль", "auth/wrong-password": "Неверная почта или пароль", "auth/user-not-found": "Такого входа нет. Сначала создайте его", "auth/email-already-in-use": "Такой вход уже есть: войдите по паролю", "auth/weak-password": "Пароль слишком простой (минимум 6 символов)", "auth/invalid-email": "Некорректная почта", "auth/operation-not-allowed": "Вход по паролю не включён в Firebase" };
+        toast(m[err.code] || "Не удалось: " + (err.code || err.message));
+      }
+    };
+    if ($("clpw")) $("clpw").onclick = e => { e.preventDefault(); pwFlow(false); };
+    if ($("clnew")) $("clnew").onclick = e => { e.preventDefault(); pwFlow(true); };
     if ($("clout")) $("clout").onclick = e => { e.preventDefault(); fb.signOut(); };
   }
   const valid = d => d && Array.isArray(d.countries) && d.countries.length && d.countries.every(k => Array.isArray(k.cities) && k.cities.every(c => Array.isArray(c.days)));
