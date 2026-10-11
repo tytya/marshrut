@@ -176,6 +176,7 @@ body.dragging{user-select:none;-webkit-user-select:none}
 .n.hotel .ic,.mk.hotel .ic{color:#fff}
 .ro #fab,.ro .ib,.ro .mx,.ro .acts,.ro .tools,.ro .gb,.ro .chip.ghost,.ro .fx,.ro [data-a^="new"],.ro [data-a^="ren"],.ro [data-a^="del"]{display:none!important}
 .loading #list,.loading #map,.loading #dy{visibility:hidden}
+.ro #share{display:none!important}
 #foot div{margin-top:6px}
 .day .head .pill{order:1}
 .day .head .right{order:2;margin-left:auto}
@@ -188,6 +189,9 @@ body.dragging{user-select:none;-webkit-user-select:none}
   .day .head .right{order:3;flex:1 1 100%;margin-left:0}
 }
 .pt.opt b{color:rgba(255,255,255,.5)!important}
+.dnote{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;background:#333;border:1px solid #444;border-radius:10px;padding:6px 10px;margin:4px 0 10px;font-size:13px;line-height:1.35;color:#e4e4e4}
+.dnote span{white-space:pre-wrap;min-width:0}
+.dnote .mx{padding:0 2px;flex:none}
 </style>
 </head>
 <body>
@@ -472,7 +476,7 @@ function render() {
       const ed = edit.has(`${c},${d}`), vs = false, rp = route(c, day), mp = mapsParts(rp);
       h += `<section class="day"><div class="head"><span class="pill" style="--dc:${day.color}"><b class="dn">День ${dayNum(c, d)}</b>${mp.length ? `<i class="sep"></i><a class="tl" href="${mp[0]}" target="_blank" rel="noopener" title="Открыть маршрут в Google Картах">${ic("link")}${day.theme ? `<span class="tt">${esc(day.theme)}</span>` : ""}</a>` : day.theme ? `<i class="sep"></i><span class="tt">${esc(day.theme)}</span>` : ""}</span>
         <button class="ib ${ed ? "on" : ""}" data-a="edit" data-i="${c},${d}" aria-label="Редактировать день" title="Редактировать">${ed ? "✓" : ic("edit")}</button><div class="right"><span class="km">${distLabel(rp)}</span></div></div>`;
-      if (day.note || ed) h += `<div class="note nt"><span style="white-space:pre-wrap;${day.note ? "" : "opacity:.5"}">${day.note ? esc(day.note) : "+ Заметка к дню"}</span><button class="mx" data-a="dnote" data-i="${c},${d}" aria-label="Заметка к дню" title="Заметка к дню">${ic("edit")}</button></div>`;
+      if (day.note || ed) h += `<div class="dnote"><span style="${day.note ? "" : "opacity:.55"}">${day.note ? esc(day.note) : "+ Заметка к дню"}</span>${ed ? `<button class="mx" data-a="dnote" data-i="${c},${d}" aria-label="Заметка к дню" title="Заметка к дню">${ic("edit")}</button>` : ""}</div>`;
       const nm = nums(day.points);
       if (city.hotel) h += `<div class="pt"><div class="n hotel">${ic("home")}</div><div class="main" tabindex="0" data-a="go" data-i="h,${c}"><b class="hn">${esc(city.hotel.t)}</b><span>Начало дня${city.hotel.d ? " · " + esc(city.hotel.d) : ""}</span>${city.hotel.h ? `<span class="hrs">${ic("clock")} ${esc(city.hotel.h)}</span>` : ""}${ghRow(city.hotel, ed, "hgh", c)}</div>` + (ed ? `<div class="acts"><button data-a="hedit" data-i="${c}" aria-label="Изменить отель">${ic("edit")}</button><button data-a="hdel" data-i="${c}" aria-label="Убрать отель">${ic("trash")}</button></div>` : "") + `</div>`;
       h += day.points.map((p, j) => `<div class="pt${p.o ? " opt" : ""}" data-r="${c},${d},${j}">` + (vs ? `<button class="cb ${p.v ? "on" : ""}" data-a="chk" data-i="${c},${d},${j}" role="checkbox" aria-checked="${!!p.v}" aria-label="Посещено">${p.v ? "✓" : ""}</button>` : `<div class="n ${isSB(p) ? "sb" : ""}">${isSB(p) ? ic("sb") : nm[j]}</div>`) + `<div class="main" tabindex="0" data-a="go" data-i="${c},${d},${j}"><b class="${isSB(p) ? "sbn" : ""}">${emo(p)} ${esc(p.t)}</b><span>${esc(p.d)}</span>${p.h ? `<span class="hrs">${ic("clock")} ${esc(p.h)}</span>` : ""}${ghRow(p, ed, "gh", `${c},${d},${j}`)}${hopTag(j ? day.points[j - 1] : city.hotel, p)}</div>` +
@@ -850,12 +854,11 @@ $("fSave").onclick = () => {
 const enc = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const dec = s => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
 $("share").onclick = async () => {
-  const co = country(), p = { n: co.name, f: co.flag, c: ci === "all" ? co.cities : [co.cities[ci]] };
-  const url = location.href.split("#")[0] + "#share=" + enc(JSON.stringify(p));
-  const title = ci === "all" ? `${co.flag} ${co.name}` : `${co.flag} ${co.name} · ${co.cities[ci].name}`;
+  const url = window.__shareLink ? await window.__shareLink() : null;   // та же короткая ссылка, что и у «Поделиться» внизу страницы
+  if (!url) return toast("Сначала войдите в облако, тогда получится короткая ссылка для просмотра");
   const btn = $("share"), old = btn.innerHTML;
-  try { await navigator.clipboard.writeText(url); btn.textContent = "✓"; btn.style.fontSize = "20px"; setTimeout(() => { btn.innerHTML = old; btn.style.fontSize = ""; }, 1500); }
-  catch (e) { ask("Скопируй ссылку", [{ k: "u", label: title, value: url }], { ok: "Готово" }); }
+  try { await navigator.clipboard.writeText(url); btn.textContent = "✓"; btn.style.fontSize = "20px"; setTimeout(() => { btn.innerHTML = old; btn.style.fontSize = ""; }, 1500); toast("Ссылка для просмотра скопирована"); }
+  catch (e) { ask("Скопируй ссылку", [{ k: "u", label: "Ссылка для просмотра", value: url }], { ok: "Готово" }); }
 };
 async function importShared() {
   if (!location.hash.startsWith("#share=")) return;
@@ -943,6 +946,11 @@ async function realFb() {
       data = { countries: q.countries, types: q.types || {} }; cc = 0; ci = "all"; cd = "all"; fillTypes(); refresh(true);
       document.documentElement.classList.remove("loading");
     }, () => toast("Не удалось открыть ссылку"));
+    if (!window.__gmKey && !localStorage.getItem("gm-asked")) setTimeout(async () => {   // один раз спрашиваем ключ карты Google
+      const r = await ask("Карта Google", [{ k: "g", label: "Ключ Google Maps", ph: "вставьте ключ" }], { text: "Чтобы карта была от Google, вставьте ключ, который вам прислали. Можно пропустить: тогда будет обычная карта.", ok: "Сохранить" });
+      localStorage.setItem("gm-asked", "1");
+      const g = r && (r.g || "").trim(); if (g) { localStorage.setItem("gm-key", g); location.reload(); }
+    }, 700);
     return;
   }
   let user = null, ref = null, off = null, timer = null, state = "";
@@ -1037,6 +1045,11 @@ async function realFb() {
       delete k.shareId; save(); shareDraw();
     };
   }
+  window.__shareLink = async () => {
+    const k = data.countries[cc]; if (!user || !k) return null;
+    if (!k.shareId) { k.shareId = rid(); try { await fb.shareSet(k.shareId, shareData(k)); } catch (_) { delete k.shareId; return null; } save(); shareDraw(); }
+    return shareLink(k.shareId);
+  };
   fb.onAuth(u => {
     if (!u && !askedLogin && !sessionStorage.getItem("skip-login") && location.protocol !== "file:") { askedLogin = true; setTimeout(loginModal, 300); }
     if (off) { off(); off = null; }
