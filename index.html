@@ -174,6 +174,20 @@ body.dragging{user-select:none;-webkit-user-select:none}
 .n.x{background:#fff}
 .n.x .ic,.mk.xm .ic{color:#f5c518}
 .n.hotel .ic,.mk.hotel .ic{color:#fff}
+.ro #fab,.ro .ib,.ro .mx,.ro .acts,.ro .tools,.ro .gb,.ro .chip.ghost,.ro .fx,.ro [data-a^="new"],.ro [data-a^="ren"],.ro [data-a^="del"]{display:none!important}
+.loading #list,.loading #map,.loading #dy{visibility:hidden}
+#foot div{margin-top:6px}
+.day .head .pill{order:1}
+.day .head .right{order:2;margin-left:auto}
+.day .head .ib{order:3}
+@media (max-width:520px){
+  .day .head{flex-wrap:wrap;row-gap:10px;align-items:center}
+  .day .head .pill{flex:0 1 auto;max-width:calc(100% - 52px);border-radius:16px}
+  .day .head .pill .tl,.day .head .pill .tt{white-space:normal;overflow:visible;text-overflow:clip;min-width:0}
+  .day .head .ib{order:2;margin-left:auto}
+  .day .head .right{order:3;flex:1 1 100%;margin-left:0}
+}
+.pt.opt b{color:rgba(255,255,255,.5)!important}
 </style>
 </head>
 <body>
@@ -228,9 +242,13 @@ body.dragging{user-select:none;-webkit-user-select:none}
   <label>Тип</label><select id="fType"></select>
   <label>Описание</label><textarea id="fDesc"></textarea>
   <label>Часы работы (необязательно)</label><input id="fHours" placeholder="Например: ежедневно 10:00–22:00"><button type="button" class="gb" id="fGh" style="display:none"><svg class="ic"><use href="#i-clock"/></svg> Подтянуть часы из Google</button>
+  <label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="fOpt" style="width:auto;margin:0"> Необязательное место (в списке бледнее)</label>
   <div class="foot"><button class="btn" id="fCancel">Отмена</button><button class="btn ok" id="fSave">Сохранить</button></div>
 </dialog>
 
+<script>
+(function () { var m = location.hash.match(/view=([A-Za-z0-9_-]{16,})/); if (m) { window.__viewOnly = true; window.__viewId = m[1]; document.documentElement.className += " ro loading"; } })();
+</script>
 <script>
 // Если в браузере сохранён ключ Google — грузим Google Maps до основного кода (иначе остаётся OpenStreetMap).
 (function () {
@@ -350,6 +368,7 @@ const DEFAULT = { countries: [
 let data;
 try { data = JSON.parse(localStorage.getItem(KEY)) || DEFAULT; } catch (e) { data = DEFAULT; }
 const save = () => {
+  if (window.__viewOnly) return;
   if (window.__booted && !window.__applying) { try { localStorage.setItem("trip-ts", Date.now()); } catch (e) {} }
   if (window.__cloudPush) window.__cloudPush(); try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -390,8 +409,9 @@ const dist = pts => { let s = 0; for (let i = 1; i < pts.length; i++) s += map.d
 
 // какие города и дни сейчас видны
 function visible() {
-  const cs = ci === "all" ? cities().map((_, i) => i) : [ci];
-  return cs.map(c => ({ c, ds: ci === "all" || cd === "all" ? cities()[c].days.map((_, i) => i) : [cd] }));
+  const sel = ci === "all" && cd !== "all" ? String(cd).split(":").map(Number) : null;   // в режиме «все города» выбран один день: "город:день"
+  const cs = sel ? [sel[0]] : ci === "all" ? cities().map((_, i) => i) : [ci];
+  return cs.map(c => ({ c, ds: sel ? [sel[1]] : ci === "all" || cd === "all" ? cities()[c].days.map((_, i) => i) : [cd] }));
 }
 
 function draw(fit) {
@@ -401,13 +421,13 @@ function draw(fit) {
     const day = cities()[c].days[d]; if (!day) return;
     const nm = nums(day.points);
     day.points.forEach((p, j) => {
-      markers[`${c},${d},${j}`] = L.marker(p.ll, { icon: L.divIcon({ className: "", iconSize: [26, 26], html: isSB(p) ? `<div class="mk sb">${ic("sb")}</div>` : `<div class="mk${p.v ? " dn" : ""}" style="background:${day.color}">${p.v ? "✓" : nm[j]}</div>` }) })
+      markers[`${c},${d},${j}`] = L.marker(p.ll, { icon: L.divIcon({ className: "", iconSize: [26, 26], html: isSB(p) ? `<div class="mk sb">${ic("sb")}</div>` : `<div class="mk" style="background:${day.color}">${nm[j]}</div>` }) })
         .bindPopup(`<div class="pp-t">${esc(p.t)}</div>${p.d ? `<div class="pp-d">${esc(p.d)}</div>` : ""}${popHours(p)}`).addTo(group);
       all.push(p.ll);
     });
     const rp = route(c, day), sg = segs(rp);
     sg.walks.forEach(g => { ensureWalk(g); L.polyline((walk[sigOf(g)]?.path) || g.map(p => p.ll), { color: day.color, weight: 5, opacity: .9 }).addTo(group); });
-    sg.hops.forEach(([a, b]) => { ensureHop(a, b); L.polyline([a.ll, b.ll], { color: day.color, weight: 4, opacity: .9, dashArray: "6 8" }).addTo(group); });
+    sg.hops.forEach(([a, b]) => { ensureHop(a, b); L.polyline(hops[hopKey(a, b)]?.path || [a.ll, b.ll], { color: day.color, weight: 4, opacity: .9, dashArray: "6 8" }).addTo(group); });
   }));
   visible().forEach(({ c }) => {
     const ho = cities()[c].hotel; if (!ho || !ho.ll) return;
@@ -416,10 +436,10 @@ function draw(fit) {
     all.push(ho.ll);
   });
   const xall = [];
-  if (ci === "all" || cd === "all") visible().forEach(({ c }) => (cities()[c].extra || []).forEach((x, k) => {
+  if (cd === "all") visible().forEach(({ c }) => (cities()[c].extra || []).forEach((x, k) => {
     if (!x.ll) return;
     const days = cities()[c].days;
-    markers[`x,${c},${k}`] = L.marker(x.ll, { icon: L.divIcon({ className: "", iconSize: [26, 26], html: isSB(x) ? `<div class="mk sb">${ic("sb")}</div>` : `<div class="mk xm">${x.v ? "✓" : ic("star")}</div>` }) })
+    markers[`x,${c},${k}`] = L.marker(x.ll, { icon: L.divIcon({ className: "", iconSize: [26, 26], html: isSB(x) ? `<div class="mk sb">${ic("sb")}</div>` : `<div class="mk xm">${ic("star")}</div>` }) })
       .bindPopup(`<div class="pp-t">${esc(x.t)}</div>${x.d ? `<div class="pp-d">${esc(x.d)}</div>` : ""}${popHours(x)}<div style="margin-top:8px">Поставить в день:</div>` + `<div class="pr">` + days.map((dd, di) => `<button class="pb" style="background:${dd.color}" data-a="xassign" data-i="${c},${k},${di}" title="День ${dayNum(c, di)}" aria-label="День ${dayNum(c, di)}">${dayNum(c, di)}</button>`).join("") + `<button class="pb ed" style="background:#ddd" data-a="xedit" data-i="${c},${k}" title="Изменить" aria-label="Изменить">${ic("edit")}</button></div>`).addTo(group);
     xall.push(x.ll);
   }));
@@ -440,30 +460,31 @@ function render() {
   $("mT").innerHTML = mi("city", "all", "Все города", ci === "all") + cities().map((x, i) => `<div class="mrow">${mi("city", i, x.name, i === ci)}<button class="mx" data-a="renCity" data-i="${i}" title="Переименовать">${ic("edit")}</button><button class="mx" data-a="delCity" data-i="${i}" title="Удалить">${ic("trash")}</button></div>`).join("") + mi("newCity", "", "+ Город", false, "sub");
   if (!$("share").innerHTML) $("share").innerHTML = ICON.copy;
   const chip = (a, i, label, on, ttl = "") => `<button class="chip ${on ? "on" : ""}" data-a="${a}" data-i="${i}" title="${esc(ttl)}" aria-label="${esc(ttl || label)}">${esc(label)}</button>`;
-  $("dy").innerHTML = ci === "all" ? "" : chip("day", "all", "Все", cd === "all", "Все дни") + cities()[ci].days.map((x, i) => `<button class="chip ${i === cd ? "on" : ""}" data-a="day" data-i="${i}" style="--dc:${x.color}">День ${dayNum(ci, i)}</button>`).join("") + `<button class="chip ghost" data-a="newDay" title="Новый день" aria-label="Новый день">+</button>`;
+  $("dy").innerHTML = ci === "all" ? chip("day", "all", "Все", cd === "all", "Все дни") + cities().map((city, c) => city.days.map((x, i) => `<button class="chip ${cd === c + ":" + i ? "on" : ""}" data-a="dayx" data-i="${c},${i}" title="${esc(city.name)}" style="--dc:${x.color}">День ${dayNum(c, i)}</button>`).join("")).join("") : chip("day", "all", "Все", cd === "all", "Все дни") + cities()[ci].days.map((x, i) => `<button class="chip ${i === cd ? "on" : ""}" data-a="day" data-i="${i}" style="--dc:${x.color}">День ${dayNum(ci, i)}</button>`).join("") + `<button class="chip ghost" data-a="newDay" title="Новый день" aria-label="Новый день">+</button>`;
 
   let h = "";
   visible().forEach(({ c, ds }) => {
     const city = cities()[c];
     if (ci === "all") h += `<h2>${esc(city.name)}</h2>`;
-    if (city.before && (ci === "all" || cd === "all" || cd === 0)) h += `<div class="note nt"><span>${esc(city.before)}</span><button class="mx" data-a="notes" data-i="${c},0" aria-label="Изменить заметку" title="Изменить">${ic("edit")}</button></div>`;
+    if (city.before && ds.includes(0)) h += `<div class="note nt"><span>${esc(city.before)}</span><button class="mx" data-a="notes" data-i="${c},0" aria-label="Изменить заметку" title="Изменить">${ic("edit")}</button></div>`;
     ds.forEach(d => {
       const day = city.days[d]; if (!day) return;
-      const ed = edit.has(`${c},${d}`), vs = vis.has(`${c},${d}`), rp = route(c, day), mp = mapsParts(rp);
+      const ed = edit.has(`${c},${d}`), vs = false, rp = route(c, day), mp = mapsParts(rp);
       h += `<section class="day"><div class="head"><span class="pill" style="--dc:${day.color}"><b class="dn">День ${dayNum(c, d)}</b>${mp.length ? `<i class="sep"></i><a class="tl" href="${mp[0]}" target="_blank" rel="noopener" title="Открыть маршрут в Google Картах">${ic("link")}${day.theme ? `<span class="tt">${esc(day.theme)}</span>` : ""}</a>` : day.theme ? `<i class="sep"></i><span class="tt">${esc(day.theme)}</span>` : ""}</span>
-        <div class="right">${(() => { const tot = day.points.filter(q => !isSB(q)).length, got = day.points.filter(q => q.v && !isSB(q)).length; return got || vs ? `<span class="km ${got === tot && tot ? "all" : ""}">✓ ${got}/${tot}</span>` : ""; })()}<span class="km">${distLabel(rp)}</span><button class="ib ${vs ? "on" : ""}" data-a="vis" data-i="${c},${d}" aria-label="Отметить посещённые" title="Отметить посещённые">${ic("check")}</button><button class="ib ${ed ? "on" : ""}" data-a="edit" data-i="${c},${d}" aria-label="Редактировать день" title="Редактировать">${ed ? "✓" : ic("edit")}</button></div></div>`;
+        <button class="ib ${ed ? "on" : ""}" data-a="edit" data-i="${c},${d}" aria-label="Редактировать день" title="Редактировать">${ed ? "✓" : ic("edit")}</button><div class="right"><span class="km">${distLabel(rp)}</span></div></div>`;
+      if (day.note || ed) h += `<div class="note nt"><span style="white-space:pre-wrap;${day.note ? "" : "opacity:.5"}">${day.note ? esc(day.note) : "+ Заметка к дню"}</span><button class="mx" data-a="dnote" data-i="${c},${d}" aria-label="Заметка к дню" title="Заметка к дню">${ic("edit")}</button></div>`;
       const nm = nums(day.points);
       if (city.hotel) h += `<div class="pt"><div class="n hotel">${ic("home")}</div><div class="main" tabindex="0" data-a="go" data-i="h,${c}"><b class="hn">${esc(city.hotel.t)}</b><span>Начало дня${city.hotel.d ? " · " + esc(city.hotel.d) : ""}</span>${city.hotel.h ? `<span class="hrs">${ic("clock")} ${esc(city.hotel.h)}</span>` : ""}${ghRow(city.hotel, ed, "hgh", c)}</div>` + (ed ? `<div class="acts"><button data-a="hedit" data-i="${c}" aria-label="Изменить отель">${ic("edit")}</button><button data-a="hdel" data-i="${c}" aria-label="Убрать отель">${ic("trash")}</button></div>` : "") + `</div>`;
-      h += day.points.map((p, j) => `<div class="pt ${p.v ? "done" : ""}" data-r="${c},${d},${j}">` + (vs ? `<button class="cb ${p.v ? "on" : ""}" data-a="chk" data-i="${c},${d},${j}" role="checkbox" aria-checked="${!!p.v}" aria-label="Посещено">${p.v ? "✓" : ""}</button>` : `<div class="n ${isSB(p) ? "sb" : ""}">${isSB(p) ? ic("sb") : nm[j]}</div>`) + `<div class="main" tabindex="0" data-a="go" data-i="${c},${d},${j}"><b class="${isSB(p) ? "sbn" : ""}">${emo(p)} ${esc(p.t)}</b><span>${esc(p.d)}</span>${p.h ? `<span class="hrs">${ic("clock")} ${esc(p.h)}</span>` : ""}${ghRow(p, ed, "gh", `${c},${d},${j}`)}${hopTag(j ? day.points[j - 1] : city.hotel, p)}</div>` +
+      h += day.points.map((p, j) => `<div class="pt${p.o ? " opt" : ""}" data-r="${c},${d},${j}">` + (vs ? `<button class="cb ${p.v ? "on" : ""}" data-a="chk" data-i="${c},${d},${j}" role="checkbox" aria-checked="${!!p.v}" aria-label="Посещено">${p.v ? "✓" : ""}</button>` : `<div class="n ${isSB(p) ? "sb" : ""}">${isSB(p) ? ic("sb") : nm[j]}</div>`) + `<div class="main" tabindex="0" data-a="go" data-i="${c},${d},${j}"><b class="${isSB(p) ? "sbn" : ""}">${emo(p)} ${esc(p.t)}</b><span>${esc(p.d)}</span>${p.h ? `<span class="hrs">${ic("clock")} ${esc(p.h)}</span>` : ""}${ghRow(p, ed, "gh", `${c},${d},${j}`)}${hopTag(j ? day.points[j - 1] : city.hotel, p)}</div>` +
         (ed ? `<div class="acts"><button data-a="pedit" data-i="${c},${d},${j}" aria-label="Изменить">${ic("edit")}</button><button data-a="toX" data-i="${c},${d},${j}" aria-label="В дополнительные места" title="В дополнительные места">${ic("back")}</button><button class="dh" data-a="drag" data-i="${c},${d},${j}" aria-label="Перетащить (или стрелки вверх и вниз)" title="Перетащить">${ic("drag")}</button><button data-a="del" data-i="${c},${d},${j}" aria-label="Удалить">${ic("trash")}</button></div>` : "") + `</div>`).join("");
       if (ed) h += `<div class="tools"><button data-a="add" data-i="${c},${d}">+ Точка</button><button data-a="rename" data-i="${c},${d}">Тема</button><button data-a="notes" data-i="${c},${d}">Заметки</button><button class="danger" data-a="delDay" data-i="${c},${d}" title="Удалить день" aria-label="Удалить день">${ic("trash")}</button></div>` + (rp.length > 2 ? `<div class="tools"><button data-a="sort" data-i="${c},${d}">⇅ Расставить по ближайшим</button></div>` : "");
       h += mapsLinks(rp) + `</section>`;
     });
-    if (city.after && (ci === "all" || cd === "all" || cd === city.days.length - 1)) h += `<div class="note nt"><span>${esc(city.after)}</span><button class="mx" data-a="notes" data-i="${c},0" aria-label="Изменить заметку" title="Изменить">${ic("edit")}</button></div>`;
-    if (ci === "all" || cd === "all") {
-      const xe = edit.has("x" + c), xv = vis.has("x" + c), xs = city.extra || [];
-      h += `<div class="note xbox"><div class="head"><span class="tag">Дополнительные места</span><div class="right"><button class="ib ${xv ? "on" : ""}" data-a="xvis" data-i="${c}" aria-label="Отметить посещённые" title="Отметить посещённые">${ic("check")}</button><button class="ib ${xe ? "on" : ""}" data-a="xtoggle" data-i="${c}" aria-label="Редактировать список" title="Редактировать">${xe ? "✓" : ic("edit")}</button></div></div>` +
-        (xs.length ? xs.map((x, k) => `<div class="pt ${x.v ? "done" : ""}">` + (xv ? `<button class="cb ${x.v ? "on" : ""}" data-a="xchk" data-i="${c},${k}" role="checkbox" aria-checked="${!!x.v}" aria-label="Посещено">${x.v ? "✓" : ""}</button>` : `<div class="n ${isSB(x) ? "sb" : "x"}">${isSB(x) ? ic("sb") : ic("star")}</div>`) + `<div class="main" tabindex="0" data-a="xgo" data-i="${c},${k}"><b class="${isSB(x) ? "sbn" : ""}">${esc(x.t)}</b><span>${esc(x.d)}</span>${x.h ? `<span class="hrs">${ic("clock")} ${esc(x.h)}</span>` : ""}${ghRow(x, xe, "xgh", `${c},${k}`)}</div><div class="acts">${xe ? `<select class="asg" data-a="xsel" data-i="${c},${k}" aria-label="Поставить в день"><option value="">Без дня</option>${city.days.map((dd, di) => `<option value="${di}">${esc(dd.name)}</option>`).join("")}</select><button data-a="xedit" data-i="${c},${k}" aria-label="Изменить">${ic("edit")}</button><button data-a="xdel" data-i="${c},${k}" aria-label="Удалить">${ic("trash")}</button>` : ""}</div></div>`).join("") : `<div class="hint">Пока пусто. Добавь места без дня, потом назначь им день.</div>`) +
+    if (city.after && ds.includes(city.days.length - 1)) h += `<div class="note nt"><span>${esc(city.after)}</span><button class="mx" data-a="notes" data-i="${c},0" aria-label="Изменить заметку" title="Изменить">${ic("edit")}</button></div>`;
+    if (cd === "all") {
+      const xe = edit.has("x" + c), xv = false, xs = city.extra || [];
+      h += `<div class="note xbox"><div class="head"><span class="tag">Дополнительные места</span><div class="right"><button class="ib ${xe ? "on" : ""}" data-a="xtoggle" data-i="${c}" aria-label="Редактировать список" title="Редактировать">${xe ? "✓" : ic("edit")}</button></div></div>` +
+        (xs.length ? xs.map((x, k) => `<div class="pt">` + (xv ? `<button class="cb ${x.v ? "on" : ""}" data-a="xchk" data-i="${c},${k}" role="checkbox" aria-checked="${!!x.v}" aria-label="Посещено">${x.v ? "✓" : ""}</button>` : `<div class="n ${isSB(x) ? "sb" : "x"}">${isSB(x) ? ic("sb") : ic("star")}</div>`) + `<div class="main" tabindex="0" data-a="xgo" data-i="${c},${k}"><b class="${isSB(x) ? "sbn" : ""}">${emo(x)} ${esc(x.t)}</b><span>${esc(x.d)}</span>${x.h ? `<span class="hrs">${ic("clock")} ${esc(x.h)}</span>` : ""}${ghRow(x, xe, "xgh", `${c},${k}`)}</div><div class="acts">${xe ? `<select class="asg" data-a="xsel" data-i="${c},${k}" aria-label="Поставить в день"><option value="">Без дня</option>${city.days.map((dd, di) => `<option value="${di}">${esc(dd.name)}</option>`).join("")}</select><button data-a="xedit" data-i="${c},${k}" aria-label="Изменить">${ic("edit")}</button><button data-a="xdel" data-i="${c},${k}" aria-label="Удалить">${ic("trash")}</button>` : ""}</div></div>`).join("") : `<div class="hint">Пока пусто. Добавь места без дня, потом назначь им день.</div>`) +
         (xe ? `<div class="tools"><button data-a="xadd" data-i="${c}">+ Место</button></div>` : "") + `</div>`;
     }
   });
@@ -485,7 +506,7 @@ const mapsParts = rp => {
 };
 const mapsLinks = rp => { const parts = mapsParts(rp); return parts.length < 2 ? "" : `<div class="gmrow"><span>🧭 Маршрут по частям:</span>` + parts.map((u, i) => `<a class="gmb" href="${u}" target="_blank" rel="noopener">Часть ${i + 1}</a>`).join("") + `</div>`; };
 // Переходы длиннее FAR метров (по прямой) считаются поездкой на транспорте: пунктир на карте, отдельно в километраже.
-const FAR = 5000, km1 = m => (m / 1000).toFixed(1).replace(".", ",");
+const FAR = 3000, km1 = m => (m / 1000).toFixed(1).replace(".", ",");
 function segs(rp) {
   const walks = [], hops = []; let cur = [];
   rp.forEach((p, i) => {
@@ -506,10 +527,10 @@ async function ensureHop(a, b) {
   const wp = p => ({ location: { latLng: { latitude: p.ll[0], longitude: p.ll[1] } } });
   try {
     const r = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", { method: "POST",
-      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": window.__gmKey, "X-Goog-FieldMask": "routes.duration" },
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": window.__gmKey, "X-Goog-FieldMask": "routes.duration,routes.polyline.encodedPolyline" },
       body: JSON.stringify({ origin: wp(a), destination: wp(b), travelMode: "TRANSIT", languageCode: "ru" }) });
     const j = await r.json(); if (!r.ok) throw new Error(j.error?.message || r.status);
-    const d = j.routes?.[0]?.duration; hops[k] = d ? { sec: parseInt(d, 10) } : { fail: true };
+    const rt = j.routes?.[0], d = rt?.duration; hops[k] = d ? { sec: parseInt(d, 10), path: rt.polyline ? google.maps.geometry.encoding.decodePath(rt.polyline.encodedPolyline).map(q => [q.lat(), q.lng()]) : null } : { fail: true };
   } catch (err) { hops[k] = { fail: true }; toast("Время на транспорте не загрузилось: " + (err.message || err)); }
   refresh(false);
 }
@@ -566,10 +587,12 @@ document.addEventListener("click", async e => {
   const yes = (title, text) => ask(title, [], { text, ok: "Удалить", danger: true });
   if (a === "open") { const m = $("m" + t.dataset.i), was = m.classList.contains("on"); closeMenus(); if (!was) m.classList.add("on"); return; }
   closeMenus();
+  if (window.__viewOnly && !/^(go|day|city|country|noop|xgo)$/.test(a)) return;
   if (a === "drag" || a === "noop") return;
   if (a === "country") { cc = c; ci = "all"; cd = "all"; return refresh(true); }
   if (a === "city") { ci = c; cd = "all"; return refresh(true); }
   if (a === "day") { cd = c; return refresh(true); }
+  if (a === "dayx") { ci = "all"; cd = c + ":" + d; return refresh(true); }
   if (a === "renCountry") {
     const x = data.countries[c], r = await ask("Страна", [{ k: "n", label: "Название", value: x.name }, { k: "f", label: "Эмодзи флага", value: x.flag || "🌍" }], { ok: "Сохранить" });
     if (!r) return; if (r.n) x.name = r.n; if (r.f) x.flag = r.f; return refresh(false);
@@ -638,6 +661,10 @@ document.addEventListener("click", async e => {
     await loadHours(id, true); const hc = hoursCache[id]; if (!hc) return;
     if (!hc.lines.length) return toast("У Google нет часов для этого места");
     p.h = compactHours(hc.lines); return refresh(false);
+  }
+  if (a === "dnote") {
+    const r = await ask("Заметка к дню", [{ k: "n", label: "Заметка", area: true, value: day.note || "" }], { ok: "Сохранить" });
+    if (!r) return; day.note = r.n.trim(); return refresh(false);
   }
   if (a === "hedit") return openForm(c, "h", 0);
   if (a === "hdel") {
@@ -749,13 +776,14 @@ function setPicked(ll, name, id) { picked = ll; pickedId = id || null; syncGh();
 function openForm(c, d, j) {
   if (!cities().length) return toast("Сначала добавь город: меню города, «+ Город».");
   editing = j !== undefined ? { c, d, j } : null;
-  c = c ?? (ci === "all" ? 0 : ci);
+  const sel = ci === "all" && cd !== "all" ? String(cd).split(":").map(Number) : null;
+  c = c ?? (sel ? sel[0] : ci === "all" ? 0 : ci);
   $("fCity").innerHTML = cities().map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join("");
   $("fCity").value = c; fillDays();
-  $("fDay").value = String(d ?? (cd === "all" ? "x" : cd));
+  $("fDay").value = String(d ?? (sel ? sel[1] : cd === "all" ? "x" : cd));
   const p = editing ? (d === "x" ? cities()[c].extra[j] : d === "h" ? cities()[c].hotel : cities()[c].days[d].points[j]) : null;
   $("fTitle").textContent = p ? "Изменить точку" : "Новая точка";
-  $("fQ").value = ""; $("fRes").innerHTML = ""; $("fName").value = p?.t || ""; $("fDesc").value = p?.d || ""; $("fHours").value = p?.h || ""; $("fType").value = d === "h" ? "hotel" : (p?.e || ""); picked = p?.ll || null; pickedId = p?.g || null; syncGh();
+  $("fQ").value = ""; $("fRes").innerHTML = ""; $("fName").value = p?.t || ""; $("fDesc").value = p?.d || ""; $("fHours").value = p?.h || ""; $("fType").value = d === "h" ? "hotel" : (p?.e || ""); picked = p?.ll || null; pickedId = p?.g || null; syncGh(); $("fOpt").checked = !!p?.o;
   $("fCoord").innerHTML = (picked ? "Место: " + picked[0].toFixed(4) + ", " + picked[1].toFixed(4) + ". Изменить: найди выше или " : "Место не выбрано. Найди его выше или ") + '<a href="#" id="fPick" style="color:#f59e0b">отметь на карте</a>.';
   $("dlg").showModal();
 }
@@ -795,7 +823,7 @@ map.on("click", e => { if (!picking) return; picking = false; $("map").classList
 $("fSave").onclick = () => {
   if (!picked) return toast("Сначала выбери место: найди его или отметь на карте.");
   const c = +$("fCity").value, name = $("fName").value.trim() || "Без названия"; let dv = $("fDay").value;
-  const pt = { t: name, e: /starbucks|старбакс/i.test(name) ? "sb" : $("fType").value, ll: picked, d: $("fDesc").value.trim(), h: $("fHours").value.trim() };
+  const pt = { t: name, e: /starbucks|старбакс/i.test(name) ? "sb" : $("fType").value, ll: picked, d: $("fDesc").value.trim(), h: $("fHours").value.trim(), o: $("fOpt").checked };
   if (pickedId) pt.g = pickedId;
   if (dv === "new" && $("fType").value !== "hotel") { cities()[c].days.push({ name: "День", theme: "", color: nextColor(), points: [] }); dv = String(cities()[c].days.length - 1); }
   const box = (cc_, v) => v === "x" ? (cities()[cc_].extra = cities()[cc_].extra || []) : cities()[cc_].days[+v].points;
@@ -847,8 +875,11 @@ refresh(true);
 window.__booted = true;   // дальше любое сохранение считается правкой пользователя
 (function () {
   const on = !!window.__gmKey;
-  $("map").insertAdjacentHTML("afterend", `<div id="gk" style="font-size:12px;color:#888;margin:6px 2px">Карта: ${on ? "Google" : "OpenStreetMap"} · <a href="#" id="gkb" style="color:#8ab4f8">${on ? "сменить ключ" : "подключить Google"}</a> · <span id="cl"></span></div>`);
-  $("list").insertAdjacentHTML("afterend", `<div id="foot" style="font-size:12px;color:#888;text-align:center;margin-top:28px">Резервная копия: <a href="#" id="gkx" style="color:#8ab4f8">сохранить в файл</a> · <a href="#" id="gki" style="color:#8ab4f8">загрузить из файла</a><input type="file" id="gkf" accept=".json,application/json" hidden></div>`);
+  $("list").insertAdjacentHTML("afterend", `<div id="foot" style="font-size:12px;color:#888;text-align:center;margin-top:28px">
+    <div><span id="cl"></span></div>
+    <div>Карта: ${on ? "Google" : "OpenStreetMap"} · <a href="#" id="gkb" style="color:#8ab4f8">${on ? "сменить ключ" : "ввести ключ Google"}</a></div>
+    <div class="fx"><span id="sh"></span></div>
+    <div class="fx">Резервная копия: <a href="#" id="gkx" style="color:#8ab4f8">сохранить в файл</a> · <a href="#" id="gki" style="color:#8ab4f8">загрузить из файла</a><input type="file" id="gkf" accept=".json,application/json" hidden></div></div>`);
   $("gkb").onclick = e => {
     e.preventDefault();
     const k = prompt("Вставь ключ Google Maps API (пусто — вернуться на OpenStreetMap):", "");
@@ -890,6 +921,10 @@ async function realFb() {
     signInRedirect: () => A.signInWithRedirect(auth, new A.GoogleAuthProvider()),
     emailIn: (e, p) => A.signInWithEmailAndPassword(auth, e, p),
     emailNew: (e, p) => A.createUserWithEmailAndPassword(auth, e, p),
+    resetPw: e => A.sendPasswordResetEmail(auth, e),
+    shareSet: (id, x) => F.setDoc(F.doc(db, "shares", id), x),
+    shareDel: id => F.deleteDoc(F.doc(db, "shares", id)),
+    shareWatch: (id, ok, err) => F.onSnapshot(F.doc(db, "shares", id), sn => ok(sn.exists() ? sn.data() : null), err),
     signOut: () => A.signOut(auth),
     doc: uid => { const r = F.doc(db, "users", uid); return { set: x => F.setDoc(r, x), onSnapshot: (ok, err) => F.onSnapshot(r, sn => ok({ exists: sn.exists(), metadata: sn.metadata, data: () => sn.data() }), err) }; }
   };
@@ -899,11 +934,22 @@ async function realFb() {
   const TS = "trip-ts", SY = "trip-sync", num = k => +(localStorage.getItem(k) || 0), ui = $("cl");
   ui.textContent = "☁ загрузка…";
   let fb; try { fb = window.__fb || await realFb(); } catch (e) { ui.textContent = "☁ Облако недоступно (нет интернета?)"; return; }
+  if (window.__viewId) {   // открыта ссылка «только просмотр»: показываем чужую поездку, свои данные не трогаем
+    ui.textContent = "👁 Только просмотр";
+    fb.shareWatch(window.__viewId, d => {
+      let q; try { q = d && JSON.parse(d.json); } catch (_) {}
+      if (!q || !Array.isArray(q.countries) || !q.countries.length) { toast("Ссылка больше не действует"); return; }
+      q.countries.forEach(k => k.cities.forEach(x => { x.extra = x.extra || []; x.days.forEach(y => { y.points = y.points || []; }); }));
+      data = { countries: q.countries, types: q.types || {} }; cc = 0; ci = "all"; cd = "all"; fillTypes(); refresh(true);
+      document.documentElement.classList.remove("loading");
+    }, () => toast("Не удалось открыть ссылку"));
+    return;
+  }
   let user = null, ref = null, off = null, timer = null, state = "";
   const lnk = (id, t) => `<a href="#" id="${id}" style="color:#8ab4f8">${t}</a>`;
   function draw() {
     const st = { saving: "сохраняю…", ok: "синхронизировано", err: "нет связи, сохранится позже" }[state] || "";
-    ui.innerHTML = user ? `☁ ${esc(user.email || "")}${st ? " · " + st : ""} · ${lnk("clout", "выйти")}` : `☁ ${lnk("clin", "войти через Google")} · ${lnk("clpw", "по паролю")} · ${lnk("clnew", "создать вход по паролю")}`;
+    ui.innerHTML = user ? `☁ ${esc(user.email || "")}${st ? " · " + st : ""}${(user.providerData || []).some(x => x.providerId === "password") ? " · " + lnk("clrs", "сменить пароль") : ""} · ${lnk("clout", "выйти")}` : `☁ ${lnk("clin", "войти через Google")} · ${lnk("clpw", "по паролю")} · ${lnk("clnew", "создать вход по паролю")} · ${lnk("clfg", "забыли пароль")}`;
     if ($("clin")) $("clin").onclick = e => {
       e.preventDefault();
       if (location.protocol === "file:") return toast("Вход работает только на опубликованном сайте, не из файла");
@@ -916,13 +962,14 @@ async function realFb() {
       const r = await ask(create ? "Создать вход по паролю" : "Вход по паролю", [{ k: "e", label: "Почта" }, { k: "p", label: "Пароль (не короче 6 символов)", pw: true }], { ok: create ? "Создать" : "Войти" });
       if (!r || !r.e || !r.p) return;
       try { await (create ? fb.emailNew : fb.emailIn)(r.e.trim(), r.p); }
-      catch (err) {
-        const m = { "auth/invalid-credential": "Неверная почта или пароль", "auth/wrong-password": "Неверная почта или пароль", "auth/user-not-found": "Такого входа нет. Сначала создайте его", "auth/email-already-in-use": "Такой вход уже есть: войдите по паролю", "auth/weak-password": "Пароль слишком простой (минимум 6 символов)", "auth/invalid-email": "Некорректная почта", "auth/operation-not-allowed": "Вход по паролю не включён в Firebase" };
-        toast(m[err.code] || "Не удалось: " + (err.code || err.message));
-      }
+      catch (err) { toast(pwMsg(err)); }
     };
     if ($("clpw")) $("clpw").onclick = e => { e.preventDefault(); pwFlow(false); };
     if ($("clnew")) $("clnew").onclick = e => { e.preventDefault(); pwFlow(true); };
+    const resetFor = async mail => { try { await fb.resetPw(mail); toast("Письмо со ссылкой отправлено на " + mail); } catch (err) { toast("Не удалось отправить: " + (err.code || err.message)); } };
+    if ($("clrs")) $("clrs").onclick = async e => { e.preventDefault(); if (await ask("Сменить пароль?", [], { text: "Отправим письмо со ссылкой для нового пароля на " + user.email + ".", ok: "Отправить" })) resetFor(user.email); };
+    if ($("clfg")) $("clfg").onclick = async e => { e.preventDefault(); const r = await ask("Забыли пароль", [{ k: "e", label: "Почта входа" }], { ok: "Отправить письмо" }); if (r && r.e) resetFor(r.e.trim()); };
+    shareDraw();
     if ($("clout")) $("clout").onclick = e => { e.preventDefault(); fb.signOut(); };
   }
   const valid = d => d && Array.isArray(d.countries) && d.countries.length && d.countries.every(k => Array.isArray(k.cities) && k.cities.every(c => Array.isArray(c.days)));
@@ -936,9 +983,9 @@ async function realFb() {
   }
   function push() {
     if (!ref) return; const ts = num(TS) || Date.now(); state = "saving"; draw();
-    ref.set({ json: JSON.stringify(data), updated: ts, v: 1 }).then(() => { localStorage.setItem(SY, ts); state = "ok"; draw(); }).catch(() => { state = "err"; draw(); });
+    ref.set({ json: JSON.stringify(data), updated: ts, v: 1 }).then(() => { localStorage.setItem(SY, ts); state = "ok"; pushShares(); draw(); }).catch(() => { state = "err"; draw(); });
   }
-  window.__cloudPush = () => { if (!ref || window.__applying) return; clearTimeout(timer); timer = setTimeout(push, 1500); };
+  window.__cloudPush = () => { shareDraw(); if (!ref || window.__applying) return; clearTimeout(timer); timer = setTimeout(push, 1500); };
   async function onDoc(snap) {
     if (snap.metadata && snap.metadata.hasPendingWrites) return;   // это наша запись
     const local = num(TS), synced = num(SY);
@@ -952,7 +999,46 @@ async function realFb() {
     else if (localNew) push();
     state = "ok"; draw();
   }
+  function pwMsg(err) {
+    const m = { "auth/invalid-credential": "Неверная почта или пароль", "auth/wrong-password": "Неверная почта или пароль", "auth/user-not-found": "Такого входа нет. Сначала создайте его", "auth/email-already-in-use": "Такой вход уже есть: войдите по паролю", "auth/weak-password": "Пароль слишком простой (минимум 6 символов)", "auth/invalid-email": "Некорректная почта", "auth/operation-not-allowed": "Вход по паролю не включён в Firebase", "auth/too-many-requests": "Слишком много попыток, подождите немного" };
+    return m[err.code] || "Не удалось: " + (err.code || err.message);
+  }
+  let askedLogin = false;
+  async function loginModal() {   // окно входа при открытии сайта
+    let em = "";
+    for (let i = 0; i < 4; i++) {
+      const r = await ask("Вход", [{ k: "e", label: "Почта", value: em }, { k: "p", label: "Пароль", pw: true }, { k: "g", label: "Ключ Google Maps (необязательно)", ph: window.__gmKey ? "уже сохранён, можно не вводить" : "для карты Google" }], { text: "Введите почту и пароль общей поездки. Если входа ещё нет, нажмите «Отмена», создать его можно внизу страницы.", ok: "Войти" });
+      if (!r) { sessionStorage.setItem("skip-login", "1"); return; }
+      em = r.e; const g = (r.g || "").trim();
+      if (!r.e.trim() || !r.p) { toast("Введите почту и пароль"); continue; }
+      try { await fb.emailIn(r.e.trim(), r.p); if (g && g !== localStorage.getItem("gm-key")) { localStorage.setItem("gm-key", g); location.reload(); } return; }
+      catch (err) { toast(pwMsg(err)); }
+    }
+  }
+  const rid = () => { const a = new Uint8Array(18); crypto.getRandomValues(a); return btoa(String.fromCharCode(...a)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+  const shareLink = id => location.origin + location.pathname + "#view=" + id;
+  const shareData = k => ({ owner: user.uid, json: JSON.stringify({ countries: [Object.assign({}, k, { shareId: undefined })], types: data.types || {} }), updated: Date.now() });
+  function pushShares() { if (user) data.countries.forEach(k => { if (k.shareId) fb.shareSet(k.shareId, shareData(k)).catch(() => {}); }); }
+  async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("Ссылка скопирована"); } catch (_) { prompt("Скопируйте ссылку:", t); } }
+  function shareDraw() {
+    const box = $("sh"); if (!box) return; const k = data.countries[cc];
+    if (!user || !k) { box.innerHTML = ""; return; }
+    box.innerHTML = k.shareId ? `Просмотр по ссылке («${esc(k.name)}»): ${lnk("shc", "скопировать ссылку")} · ${lnk("sho", "закрыть доступ")}` : lnk("shn", `Поделиться «${esc(k.name)}» только для просмотра`);
+    if ($("shn")) $("shn").onclick = async e => {
+      e.preventDefault(); k.shareId = rid();
+      try { await fb.shareSet(k.shareId, shareData(k)); } catch (err) { delete k.shareId; return toast("Не удалось создать ссылку. Проверьте правила Firestore"); }
+      save(); shareDraw(); copyText(shareLink(k.shareId));
+    };
+    if ($("shc")) $("shc").onclick = e => { e.preventDefault(); copyText(shareLink(k.shareId)); };
+    if ($("sho")) $("sho").onclick = async e => {
+      e.preventDefault();
+      if (!await ask("Закрыть доступ?", [], { text: "Ссылка перестанет открываться у всех, кому вы её отправляли.", ok: "Закрыть", danger: true })) return;
+      try { await fb.shareDel(k.shareId); } catch (_) {}
+      delete k.shareId; save(); shareDraw();
+    };
+  }
   fb.onAuth(u => {
+    if (!u && !askedLogin && !sessionStorage.getItem("skip-login") && location.protocol !== "file:") { askedLogin = true; setTimeout(loginModal, 300); }
     if (off) { off(); off = null; }
     user = u; ref = u ? fb.doc(u.uid) : null; state = "";
     if (ref) off = ref.onSnapshot(onDoc, () => { state = "err"; draw(); });
