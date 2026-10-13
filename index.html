@@ -11,7 +11,7 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 "Inter",system-ui,sans-serif}
 .wrap{max-width:720px;margin:0 auto;padding:16px 16px 90px}
-.top{display:flex;align-items:center;justify-content:space-between;margin:6px 0 12px;gap:8px}
+.top{display:flex;align-items:center;justify-content:flex-start;margin:6px 0 12px;gap:8px}
 h1{font-size:24px;margin:0}
 h2{font-size:18px;margin:22px 0 4px}
 #map{height:340px;border-radius:16px;border:2px solid var(--blue)}
@@ -473,10 +473,10 @@ function render() {
     if (city.before && ds.includes(0)) h += `<div class="note nt"><span>${esc(city.before)}</span><button class="mx" data-a="notes" data-i="${c},0" aria-label="Изменить заметку" title="Изменить">${ic("edit")}</button></div>`;
     ds.forEach(d => {
       const day = city.days[d]; if (!day) return;
-      const ed = edit.has(`${c},${d}`), vs = false, rp = route(c, day), mp = mapsParts(rp);
-      h += `<section class="day"><div class="head"><span class="pill" style="--dc:${day.color}"><b class="dn">День ${dayNum(c, d)}</b>${mp.length ? `<i class="sep"></i><a class="tl" href="${mp[0]}" target="_blank" rel="noopener" title="Открыть маршрут в Google Картах">${ic("link")}${day.theme ? `<span class="tt">${esc(day.theme)}</span>` : ""}</a>` : day.theme ? `<i class="sep"></i><span class="tt">${esc(day.theme)}</span>` : ""}</span>
+      const ed = edit.has(`${c},${d}`), vs = false, rp = route(c, day), mp = mapsParts(rp),
+        noteHtml = day.note || ed ? `<div class="dnote"><span style="${day.note ? "" : "opacity:.55"}">${day.note ? esc(day.note) : "+ Заметка к дню"}</span>${ed ? `<button class="mx" data-a="dnote" data-i="${c},${d}" aria-label="Заметка к дню" title="Заметка к дню">${ic("edit")}</button>` : ""}</div>` : "";
+      h += `<section class="day">${noteHtml}<div class="head"><span class="pill" style="--dc:${day.color}"><b class="dn">День ${dayNum(c, d)}</b>${mp.length ? `<i class="sep"></i><a class="tl" href="${mp[0]}" target="_blank" rel="noopener" title="Открыть маршрут в Google Картах">${ic("link")}${day.theme ? `<span class="tt">${esc(day.theme)}</span>` : ""}</a>` : day.theme ? `<i class="sep"></i><span class="tt">${esc(day.theme)}</span>` : ""}</span>
         <button class="ib ${ed ? "on" : ""}" data-a="edit" data-i="${c},${d}" aria-label="Редактировать день" title="Редактировать">${ed ? "✓" : ic("edit")}</button><div class="right"><span class="km">${distLabel(rp)}</span></div></div>`;
-      if (day.note || ed) h += `<div class="dnote"><span style="${day.note ? "" : "opacity:.55"}">${day.note ? esc(day.note) : "+ Заметка к дню"}</span>${ed ? `<button class="mx" data-a="dnote" data-i="${c},${d}" aria-label="Заметка к дню" title="Заметка к дню">${ic("edit")}</button>` : ""}</div>`;
       const nm = nums(day.points);
       if (city.hotel) h += `<div class="pt"><div class="n hotel">${ic("home")}</div><div class="main" tabindex="0" data-a="go" data-i="h,${c}"><b class="hn">${esc(city.hotel.t)}</b><span>Начало дня${city.hotel.d ? " · " + esc(city.hotel.d) : ""}</span>${city.hotel.h ? `<span class="hrs">${ic("clock")} ${esc(city.hotel.h)}</span>` : ""}${ghRow(city.hotel, ed, "hgh", c)}</div>` + (ed ? `<div class="acts"><button data-a="hedit" data-i="${c}" aria-label="Изменить отель">${ic("edit")}</button><button data-a="hdel" data-i="${c}" aria-label="Убрать отель">${ic("trash")}</button></div>` : "") + `</div>`;
       h += day.points.map((p, j) => `<div class="pt${p.o ? " opt" : ""}" data-r="${c},${d},${j}">` + (vs ? `<button class="cb ${p.v ? "on" : ""}" data-a="chk" data-i="${c},${d},${j}" role="checkbox" aria-checked="${!!p.v}" aria-label="Посещено">${p.v ? "✓" : ""}</button>` : `<div class="n ${isSB(p) ? "sb" : ""}">${isSB(p) ? ic("sb") : nm[j]}</div>`) + `<div class="main" tabindex="0" data-a="go" data-i="${c},${d},${j}"><b class="${isSB(p) ? "sbn" : ""}">${emo(p)} ${esc(p.t)}</b><span>${esc(p.d)}</span>${p.h ? `<span class="hrs">${ic("clock")} ${esc(p.h)}</span>` : ""}${ghRow(p, ed, "gh", `${c},${d},${j}`)}${hopTag(j ? day.points[j - 1] : city.hotel, p)}</div>` +
@@ -484,13 +484,13 @@ function render() {
       if (ed) h += `<div class="tools"><button data-a="add" data-i="${c},${d}">+ Точка</button><button data-a="rename" data-i="${c},${d}">Тема</button><button data-a="notes" data-i="${c},${d}">Заметки</button><button class="danger" data-a="delDay" data-i="${c},${d}" title="Удалить день" aria-label="Удалить день">${ic("trash")}</button></div>` + (rp.length > 2 ? `<div class="tools"><button data-a="sort" data-i="${c},${d}">⇅ Расставить по ближайшим</button></div>` : "");
       h += mapsLinks(rp) + `</section>`;
     });
-    if (city.after && ds.includes(city.days.length - 1)) h += `<div class="note nt"><span>${esc(city.after)}</span><button class="mx" data-a="notes" data-i="${c},0" aria-label="Изменить заметку" title="Изменить">${ic("edit")}</button></div>`;
     if (cd === "all") {
       const xe = edit.has("x" + c), xv = false, xs = city.extra || [];
       h += `<div class="note xbox"><div class="head"><span class="tag">Дополнительные места</span><div class="right"><button class="ib ${xe ? "on" : ""}" data-a="xtoggle" data-i="${c}" aria-label="Редактировать список" title="Редактировать">${xe ? "✓" : ic("edit")}</button></div></div>` +
         (xs.length ? xs.map((x, k) => `<div class="pt">` + (xv ? `<button class="cb ${x.v ? "on" : ""}" data-a="xchk" data-i="${c},${k}" role="checkbox" aria-checked="${!!x.v}" aria-label="Посещено">${x.v ? "✓" : ""}</button>` : `<div class="n ${isSB(x) ? "sb" : "x"}">${isSB(x) ? ic("sb") : ic("star")}</div>`) + `<div class="main" tabindex="0" data-a="xgo" data-i="${c},${k}"><b class="${isSB(x) ? "sbn" : ""}">${emo(x)} ${esc(x.t)}</b><span>${esc(x.d)}</span>${x.h ? `<span class="hrs">${ic("clock")} ${esc(x.h)}</span>` : ""}${ghRow(x, xe, "xgh", `${c},${k}`)}</div><div class="acts">${xe ? `<select class="asg" data-a="xsel" data-i="${c},${k}" aria-label="Поставить в день"><option value="">Без дня</option>${city.days.map((dd, di) => `<option value="${di}">${esc(dd.name)}</option>`).join("")}</select><button data-a="xedit" data-i="${c},${k}" aria-label="Изменить">${ic("edit")}</button><button data-a="xdel" data-i="${c},${k}" aria-label="Удалить">${ic("trash")}</button>` : ""}</div></div>`).join("") : `<div class="hint">Пока пусто. Добавь места без дня, потом назначь им день.</div>`) +
         (xe ? `<div class="tools"><button data-a="xadd" data-i="${c}">+ Место</button></div>` : "") + `</div>`;
     }
+    if (city.after && ds.includes(city.days.length - 1)) h += `<div class="note nt"><span>${esc(city.after)}</span><button class="mx" data-a="notes" data-i="${c},0" aria-label="Изменить заметку" title="Изменить">${ic("edit")}</button></div>`;
   });
   $("list").innerHTML = h;
 }
@@ -539,8 +539,8 @@ async function ensureHop(a, b) {
   refresh(false);
 }
 function distLabel(rp) {
-  const sg = segs(rp), loaded = sg.walks.length > 0 && sg.walks.every(g => walk[sigOf(g)]?.m != null), parts = [];
-  if (sg.walks.length || !sg.hops.length) parts.push((loaded ? "🚶 " : "🚶≈ ") + km1(sg.walks.reduce((n, g) => n + (loaded ? walk[sigOf(g)].m : plen(g)), 0)) + " км");
+  const sg = segs(rp), loaded = sg.walks.length > 0 && sg.walks.every(g => walk[sigOf(g)]?.m != null && !walk[sigOf(g)].partial), parts = [];
+  if (sg.walks.length || !sg.hops.length) parts.push((loaded ? "🚶 " : "🚶≈ ") + km1(sg.walks.reduce((n, g) => n + (walk[sigOf(g)]?.m != null ? walk[sigOf(g)].m : plen(g)), 0)) + " км");
   if (sg.hops.length) { const t = sg.hops.map(([a, b]) => hopTime(a, b)); parts.push("🚌 " + (t.every(x => x.real) ? "" : "≈") + fmtMin(t.reduce((n, x) => n + x.sec, 0))); }
   return parts.join(" · ");
 }
@@ -578,8 +578,28 @@ async function ensureWalk(pts0) {
     const j = await r.json(); if (!r.ok) throw new Error(j.error?.message || r.status);
     const rt = j.routes?.[0]; if (!rt) throw new Error("маршрут не найден");
     walk[k] = { m: rt.distanceMeters || 0, path: google.maps.geometry.encoding.decodePath(rt.polyline.encodedPolyline).map(q => [q.lat(), q.lng()]) };
-  } catch (err) { walk[k] = { fail: true }; toast("Пешие маршруты недоступны: " + (err.message || err)); }
+  } catch (err) {
+    if (err.message === "маршрут не найден") {   // Google не нашёл пешую дорогу для всего дня: считаем по участкам, где нет дороги, рисуем прямую
+      let m = 0, path = []; const bad = [];
+      for (let i = 1; i < pts0.length; i++) {
+        let leg = null;
+        if (pts0.length > 2) { try { leg = await walkLeg(pts0[i - 1], pts0[i]); } catch (_) {} }
+        if (leg) { m += leg.m; path = path.concat(leg.path); }
+        else { m += map.distance(pts0[i - 1].ll, pts0[i].ll); path = path.concat([pts0[i - 1].ll, pts0[i].ll]); bad.push((pts0[i - 1].t || "точка") + " → " + (pts0[i].t || "точка")); }
+      }
+      walk[k] = { m, path, partial: bad.length > 0 };
+      if (bad.length) toast("Нет пешего пути: " + bad.slice(0, 2).join("; ") + (bad.length > 2 ? " и др." : "") + ". Там показана прямая линия.");
+    } else { walk[k] = { fail: true }; toast("Пешие маршруты недоступны: " + (err.message || err)); }
+  }
   refresh(false);
+}
+async function walkLeg(a, b) {   // один пеший участок между двумя точками; null, если пути нет
+  const wp = p => ({ location: { latLng: { latitude: p.ll[0], longitude: p.ll[1] } } });
+  const r = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", { method: "POST",
+    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": window.__gmKey, "X-Goog-FieldMask": "routes.distanceMeters,routes.polyline.encodedPolyline" },
+    body: JSON.stringify({ origin: wp(a), destination: wp(b), travelMode: "WALK", languageCode: "ru" }) });
+  const j = await r.json(); if (!r.ok) throw new Error(j.error?.message || r.status);
+  const rt = j.routes?.[0]; return rt ? { m: rt.distanceMeters || 0, path: google.maps.geometry.encoding.decodePath(rt.polyline.encodedPolyline).map(q => [q.lat(), q.lng()]) } : null;
 }
 
 // ---- действия ----
