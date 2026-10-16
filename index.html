@@ -611,7 +611,7 @@ document.addEventListener("click", async e => {
   const yes = (title, text) => ask(title, [], { text, ok: "Удалить", danger: true });
   if (a === "open") { const m = $("m" + t.dataset.i), was = m.classList.contains("on"); closeMenus(); if (!was) m.classList.add("on"); return; }
   closeMenus();
-  if (window.__viewOnly && !/^(go|day|city|country|noop|xgo)$/.test(a)) return;
+  if (window.__viewOnly && !/^(go|day|dayx|city|country|noop|xgo)$/.test(a)) return;
   if (a === "drag" || a === "noop") return;
   if (a === "country") { cc = c; ci = "all"; cd = "all"; return refresh(true); }
   if (a === "city") { ci = c; cd = "all"; return refresh(true); }
