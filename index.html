@@ -371,8 +371,20 @@ const DEFAULT = { countries: [
 
 let data;
 try { data = JSON.parse(localStorage.getItem(KEY)) || DEFAULT; } catch (e) { data = DEFAULT; }
+// Копии данных в этом браузере: последние 8, раз в 10 минут и перед любой заменой данных (из облака, из файла, из копии).
+let lastSnap = 0;
+function snap(why) {
+  try {
+    if (!data || !data.countries) return; const raw = JSON.stringify(data); if (raw.length > 700000) return;
+    const list = JSON.parse(localStorage.getItem("trip-snaps") || "[]"); if (list[0] && list[0].raw === raw) return;
+    const n = data.countries.reduce((a, k) => a + k.cities.reduce((b, c) => b + c.days.reduce((q, y) => q + (y.points || []).length, 0), 0), 0);
+    list.unshift({ t: Date.now(), why, n, raw }); localStorage.setItem("trip-snaps", JSON.stringify(list.slice(0, 8)));
+    if (window.__snapDraw) window.__snapDraw();
+  } catch (e) {}
+}
 const save = () => {
   if (window.__viewOnly) return;
+  if (window.__booted && Date.now() - lastSnap > 600000) { lastSnap = Date.now(); snap("авто"); }
   if (window.__booted && !window.__applying) { try { localStorage.setItem("trip-ts", Date.now()); } catch (e) {} }
   if (window.__cloudPush) window.__cloudPush(); try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -902,6 +914,7 @@ window.__booted = true;   // дальше любое сохранение счи
     <div><span id="cl"></span></div>
     <div>Карта: ${on ? "Google" : "OpenStreetMap"} · <a href="#" id="gkb" style="color:#8ab4f8">${on ? "сменить ключ" : "ввести ключ Google"}</a></div>
     <div class="fx"><span id="sh"></span></div>
+    <div class="fx" id="sn"></div>
     <div class="fx">Резервная копия: <a href="#" id="gkx" style="color:#8ab4f8">сохранить в файл</a> · <a href="#" id="gki" style="color:#8ab4f8">загрузить из файла</a><input type="file" id="gkf" accept=".json,application/json" hidden></div></div>`);
   $("gkb").onclick = e => {
     e.preventDefault();
@@ -917,6 +930,17 @@ window.__booted = true;   // дальше любое сохранение счи
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast("Файл сохранён");
   };
   $("gki").onclick = e => { e.preventDefault(); $("gkf").click(); };
+  function snapDraw() {
+    const list = JSON.parse(localStorage.getItem("trip-snaps") || "[]");
+    $("sn").innerHTML = list.length ? "Копии в этом браузере: " + list.map((x, i) => `<a href="#" data-snap="${i}" style="color:#8ab4f8" title="${esc(x.why)}">${new Date(x.t).toLocaleString("ru", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} (${x.n} точек)</a>`).join(" · ") : "";
+  }
+  window.__snapDraw = snapDraw; snapDraw();
+  document.addEventListener("click", async e => {
+    const a = e.target.closest("[data-snap]"); if (!a) return; e.preventDefault();
+    const x = JSON.parse(localStorage.getItem("trip-snaps") || "[]")[+a.dataset.snap]; if (!x) return;
+    if (!await ask("Восстановить копию?", [], { text: `Копия от ${new Date(x.t).toLocaleString("ru")}: ${x.n} точек. Текущие данные будут заменены (их копия тоже сохранится).`, ok: "Восстановить", danger: true })) return;
+    snap("перед восстановлением"); data = JSON.parse(x.raw); cc = 0; ci = "all"; cd = "all"; edit.clear(); vis.clear(); fillTypes(); refresh(true); toast("Копия восстановлена");
+  });
   $("gkf").onchange = async () => {
     const f = $("gkf").files[0]; $("gkf").value = ""; if (!f) return;
     let j; try { j = JSON.parse(await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsText(f); })); } catch (_) { return toast("Не удалось прочитать файл"); }
@@ -925,6 +949,7 @@ window.__booted = true;   // дальше любое сохранение счи
     const n = d.countries.reduce((a, k) => a + k.cities.length, 0);
     if (!await ask("Загрузить данные из файла?", [], { text: `В файле стран: ${d.countries.length}, городов: ${n}. Текущие данные будут заменены. Если они нужны, сначала сохраните их в файл.`, ok: "Заменить", danger: true })) return;
     d.countries.forEach(k => k.cities.forEach(c => { c.extra = c.extra || []; c.days.forEach(x => { x.points = x.points || []; }); }));
+    snap("перед загрузкой из файла");
     data = d; cc = 0; ci = "all"; cd = "all"; edit.clear(); vis.clear(); fillTypes(); refresh(true); toast("Данные загружены");
   };
 })();
@@ -1004,6 +1029,7 @@ async function realFb() {
   function adopt(c) {   // взять данные из облака
     let d; try { d = JSON.parse(c.json); } catch (_) { return; } if (!valid(d)) return;
     d.countries.forEach(k => k.cities.forEach(x => { x.extra = x.extra || []; x.days.forEach(y => { y.points = y.points || []; }); }));
+    snap("перед загрузкой из облака");
     window.__applying = true;
     data = d; cc = Math.min(cc, d.countries.length - 1); ci = "all"; cd = "all"; edit.clear(); vis.clear(); fillTypes(); refresh(true);
     window.__applying = false;
