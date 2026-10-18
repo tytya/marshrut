@@ -396,10 +396,10 @@ function ask(title, fields = [], o = {}) {
     $("qT").textContent = title;
     $("qB").innerHTML = (o.text ? `<div style="margin:4px 0 0">${esc(o.text)}</div>` : "") + fields.map((f, i) => `<label>${esc(f.label)}</label>${f.area ? `<textarea id="q${i}" placeholder="${esc(f.ph || "")}">${esc(f.value || "")}</textarea>` : `<input id="q${i}" type="${f.pw ? "password" : "text"}" ${f.pw ? 'autocomplete="current-password"' : ""} value="${esc(f.value || "")}" placeholder="${esc(f.ph || "")}">`}`).join("");
     $("qOk").textContent = o.ok || "OK"; $("qOk").className = "btn " + (o.danger ? "danger" : "ok");
-    const fin = v => { if (done) return; done = true; res(v); if (dq.open) dq.close(); };
+    const fin = v => { if (done) return; done = true; res(v); if (dq.open) { ask.sw = (ask.sw || 0) + 1; dq.close(); } };   // sw: запоздалое событие close от этого закрытия не должно закрыть следующее окно
     $("qOk").onclick = () => fin(Object.fromEntries(fields.map((f, i) => [f.k, $("q" + i).value.trim()])));
     $("qNo").onclick = () => fin(null);
-    dq.onclose = () => fin(null);
+    dq.onclose = () => { if (ask.sw > 0) { ask.sw--; return; } fin(null); };
     $("qB").onkeydown = e => { if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") $("qOk").click(); };
     dq.showModal();
     const f0 = $("q0"); if (f0) f0.focus();
@@ -943,6 +943,7 @@ window.__booted = true;   // дальше любое сохранение счи
   });
   async function importText(text) {   // данные из файла копии, из текста или из поля json в Firebase
     let j; try { j = JSON.parse(text); } catch (_) { return toast("Не удалось прочитать: нужен текст данных (JSON)"); }
+    if (typeof j === "string") { try { j = JSON.parse(j); } catch (_) {} }   // текст скопирован вместе с внешними кавычками из консоли Firebase
     if (j && typeof j.json === "string") { try { j = JSON.parse(j.json); } catch (_) {} }   // документ Firestore: данные лежат в поле json
     const d = j && j.app === "marshrut" ? j.data : j;
     if (!d || !Array.isArray(d.countries) || !d.countries.length || !d.countries.every(k => Array.isArray(k.cities) && k.cities.every(c => Array.isArray(c.days)))) return toast("Это не данные маршрутов");
