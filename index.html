@@ -915,7 +915,7 @@ window.__booted = true;   // дальше любое сохранение счи
     <div>Карта: ${on ? "Google" : "OpenStreetMap"} · <a href="#" id="gkb" style="color:#8ab4f8">${on ? "сменить ключ" : "ввести ключ Google"}</a></div>
     <div class="fx"><span id="sh"></span></div>
     <div class="fx" id="sn"></div>
-    <div class="fx">Резервная копия: <a href="#" id="gkx" style="color:#8ab4f8">сохранить в файл</a> · <a href="#" id="gki" style="color:#8ab4f8">загрузить из файла</a><input type="file" id="gkf" accept=".json,application/json" hidden></div></div>`);
+    <div class="fx">Резервная копия: <a href="#" id="gkx" style="color:#8ab4f8">сохранить в файл</a> · <a href="#" id="gki" style="color:#8ab4f8">загрузить из файла</a> · <a href="#" id="gkt" style="color:#8ab4f8">вставить из текста</a><input type="file" id="gkf" accept=".json,application/json" hidden></div></div>`);
   $("gkb").onclick = e => {
     e.preventDefault();
     const k = prompt("Вставь ключ Google Maps API (пусто — вернуться на OpenStreetMap):", "");
@@ -941,16 +941,26 @@ window.__booted = true;   // дальше любое сохранение счи
     if (!await ask("Восстановить копию?", [], { text: `Копия от ${new Date(x.t).toLocaleString("ru")}: ${x.n} точек. Текущие данные будут заменены (их копия тоже сохранится).`, ok: "Восстановить", danger: true })) return;
     snap("перед восстановлением"); data = JSON.parse(x.raw); cc = 0; ci = "all"; cd = "all"; edit.clear(); vis.clear(); fillTypes(); refresh(true); toast("Копия восстановлена");
   });
+  async function importText(text) {   // данные из файла копии, из текста или из поля json в Firebase
+    let j; try { j = JSON.parse(text); } catch (_) { return toast("Не удалось прочитать: нужен текст данных (JSON)"); }
+    if (j && typeof j.json === "string") { try { j = JSON.parse(j.json); } catch (_) {} }   // документ Firestore: данные лежат в поле json
+    const d = j && j.app === "marshrut" ? j.data : j;
+    if (!d || !Array.isArray(d.countries) || !d.countries.length || !d.countries.every(k => Array.isArray(k.cities) && k.cities.every(c => Array.isArray(c.days)))) return toast("Это не данные маршрутов");
+    const n = d.countries.reduce((a, k) => a + k.cities.length, 0), pts = d.countries.reduce((a, k) => a + k.cities.reduce((b, c) => b + c.days.reduce((q, y) => q + (y.points || []).length, 0), 0), 0);
+    if (!await ask("Загрузить эти данные?", [], { text: `Стран: ${d.countries.length}, городов: ${n}, точек в днях: ${pts}. Текущие данные будут заменены (их копия сохранится внизу страницы).`, ok: "Заменить", danger: true })) return;
+    d.countries.forEach(k => k.cities.forEach(c => { c.extra = c.extra || []; c.days.forEach(x => { x.points = x.points || []; }); }));
+    snap("перед загрузкой данных");
+    data = d; cc = 0; ci = "all"; cd = "all"; edit.clear(); vis.clear(); fillTypes(); refresh(true); toast("Данные загружены");
+  }
   $("gkf").onchange = async () => {
     const f = $("gkf").files[0]; $("gkf").value = ""; if (!f) return;
-    let j; try { j = JSON.parse(await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsText(f); })); } catch (_) { return toast("Не удалось прочитать файл"); }
-    const d = j && j.app === "marshrut" ? j.data : j;
-    if (!d || !Array.isArray(d.countries) || !d.countries.length || !d.countries.every(k => Array.isArray(k.cities) && k.cities.every(c => Array.isArray(c.days)))) return toast("Это не файл с маршрутами");
-    const n = d.countries.reduce((a, k) => a + k.cities.length, 0);
-    if (!await ask("Загрузить данные из файла?", [], { text: `В файле стран: ${d.countries.length}, городов: ${n}. Текущие данные будут заменены. Если они нужны, сначала сохраните их в файл.`, ok: "Заменить", danger: true })) return;
-    d.countries.forEach(k => k.cities.forEach(c => { c.extra = c.extra || []; c.days.forEach(x => { x.points = x.points || []; }); }));
-    snap("перед загрузкой из файла");
-    data = d; cc = 0; ci = "all"; cd = "all"; edit.clear(); vis.clear(); fillTypes(); refresh(true); toast("Данные загружены");
+    let t; try { t = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsText(f); }); } catch (_) { return toast("Не удалось прочитать файл"); }
+    importText(t);
+  };
+  $("gkt").onclick = async e => {
+    e.preventDefault();
+    const r = await ask("Вставить данные из текста", [{ k: "j", label: "Вставьте текст данных (JSON)", area: true, ph: "{\"countries\":[…" }], { text: "Подойдёт текст из файла копии или из поля json документа в Firebase.", ok: "Дальше" });
+    if (r && r.j && r.j.trim()) importText(r.j);
   };
 })();
 // Адаптер Firebase (SDK подгружается по требованию). База данных: именованная, "marshrut".
